@@ -1,0 +1,676 @@
+import { Button } from "std-widgets.slint";
+
+export struct SymbolEntry {
+    name: string,
+    x: float,
+    y: float,
+    value: string,
+}
+
+export struct Connection {
+    from_index: int,
+    to_index: int,
+    selected: bool,
+}
+
+// ======================================================
+// PALETTE NODE
+// ======================================================
+
+component PaletteNode inherits Rectangle {
+
+    in property <string> label;
+
+    callback drag_node();
+
+    height: 34px;
+
+    border-radius: 4px;
+
+    background: touch.has-hover ? #d7e3fc : #f1f3f4;
+
+    border-width: 1px;
+    border-color: #d0d0d0;
+
+    Text {
+
+        text: root.label;
+
+        color: #222;
+
+        x: 10px;
+
+        vertical-alignment: center;
+
+        height: parent.height;
+    }
+
+    touch := TouchArea {
+
+        mouse-cursor: grab;
+
+        moved => {
+
+            root.drag_node();
+        }
+    }
+}
+
+// ======================================================
+// CATEGORY
+// ======================================================
+
+component NodeCategory inherits Rectangle {
+
+    in property <string> title;
+
+    in property <brush> header_color;
+
+    in property <[string]> nodes;
+
+    in-out property <bool> expanded: true;
+
+    callback start_drag(string);
+
+    background: transparent;
+
+    VerticalLayout {
+
+        spacing: 4px;
+
+        // HEADER
+        Rectangle {
+
+            height: 36px;
+
+            border-radius: 6px;
+
+            background: root.header_color;
+
+            Text {
+
+                text: (root.expanded ? "▼ " : "▶ ") + root.title;
+
+                color: white;
+
+                font-weight: 700;
+
+                x: 10px;
+
+                vertical-alignment: center;
+
+                height: parent.height;
+            }
+
+            TouchArea {
+
+                clicked => {
+
+                    root.expanded = !root.expanded;
+                }
+            }
+        }
+
+        // NODES
+        if (root.expanded): VerticalLayout {
+
+            spacing: 4px;
+
+            for node in root.nodes: PaletteNode {
+
+                label: node;
+
+                drag_node => {
+
+                    root.start_drag(node);
+                }
+            }
+        }
+    }
+}
+
+// ======================================================
+// NODE
+// ======================================================
+
+component NodeSymbol inherits Rectangle {
+
+    callback port_clicked(bool);
+
+    in property <string> label;
+
+    width: 120px;
+    height: 40px;
+
+    background: #e3f2fd;
+
+    border-width: 1px;
+
+    border-color: #2196f3;
+
+    border-radius: 5px;
+
+    // INPUT PORT
+    Rectangle {
+
+        x: -5px;
+        y: 15px;
+
+        width: 10px;
+        height: 10px;
+
+        border-radius: 5px;
+
+        background: input_touch.has-hover ? orange : #0288d1;
+
+        input_touch := TouchArea {
+
+            clicked => {
+
+                root.port_clicked(true);
+            }
+        }
+    }
+
+    // OUTPUT PORT
+    Rectangle {
+
+        x: 115px;
+        y: 15px;
+
+        width: 10px;
+        height: 10px;
+
+        border-radius: 5px;
+
+        background: output_touch.has-hover ? orange : #0288d1;
+
+        output_touch := TouchArea {
+
+            clicked => {
+
+                root.port_clicked(false);
+            }
+        }
+    }
+
+    Text {
+
+        text: root.label;
+
+        color: #222;
+
+        width: 100%;
+
+        horizontal-alignment: center;
+
+        vertical-alignment: center;
+    }
+}
+
+// ======================================================
+// MAIN WINDOW
+// ======================================================
+
+export component AppWindow inherits Window {
+
+    width: 1300px;
+    height: 760px;
+
+    // ==================================================
+    // PROPERTIES
+    // ==================================================
+
+    in-out property <[SymbolEntry]> all_symbols: [];
+
+    in-out property <[Connection]> connections: [];
+
+    in-out property <int> selected_index: -1;
+
+    // DRAGGING
+    in-out property <bool> is_dragging: false;
+
+    in-out property <string> drag_name: "";
+
+    in-out property <float> drag_x: 0;
+
+    in-out property <float> drag_y: 0;
+
+    // ==================================================
+    // CALLBACKS
+    // ==================================================
+
+    callback select_library_symbol(string);
+
+    callback place_symbol(float, float);
+
+    callback update_symbol_position(int, float, float);
+
+    callback handle_port_click(int, bool);
+
+    callback select_connection(int);
+
+    callback delete_selected_connection();
+
+    callback delete_selected_symbol();
+
+    callback clear_canvas();
+
+    callback import_xml();
+
+    // ==================================================
+    // LAYOUT
+    // ==================================================
+
+    HorizontalLayout {
+
+        // ==================================================
+        // SIDEBAR
+        // ==================================================
+
+        Rectangle {
+
+            width: 280px;
+
+            background: #f7f7f7;
+
+            border-width: 1px;
+
+            border-color: #dcdcdc;
+
+            VerticalLayout {
+
+                padding: 12px;
+
+                spacing: 10px;
+
+                // TITLE
+                // Rectangle {
+
+                //     height: 44px;
+
+                //     border-radius: 6px;
+
+                //     background: #263238;
+
+                //     Text {
+
+                //         text: "Node Palette";
+
+                //         color: white;
+
+                //         font-size: 20px;
+
+                //         font-weight: 700;
+
+                //         horizontal-alignment:
+                //             center;
+
+                //         vertical-alignment:
+                //             center;
+
+                //         width: 100%;
+                //         height: 100%;
+                //     }
+                // }
+
+                // COMMON
+                NodeCategory {
+
+                    title: "Common";
+
+                    header_color: #607d8b;
+
+                    nodes: ["Text", "Button", "Dropdown", "Label"];
+
+                    start_drag(node) => {
+
+                        root.is_dragging = true;
+
+                        root.drag_name = node;
+
+                        root.drag_x = 320;
+
+                        root.drag_y = 120;
+
+                        root.select_library_symbol(
+                            node);
+                    }
+                }
+
+                // DASHBOARD
+                NodeCategory {
+
+                    title: "Dashboard";
+
+                    header_color: #43a047;
+
+                    nodes: ["Chart", "Gauge", "Switch", "Slider"];
+
+                    start_drag(node) => {
+
+                        root.is_dragging = true;
+
+                        root.drag_name = node;
+
+                        root.drag_x = 320;
+
+                        root.drag_y = 120;
+
+                        root.select_library_symbol(
+                            node);
+                    }
+                }
+
+                // NETWORK
+                NodeCategory {
+
+                    title: "Network";
+
+                    header_color: #1e88e5;
+
+                    nodes: ["MQTT", "HTTP", "TCP", "UDP"];
+
+                    start_drag(node) => {
+
+                        root.is_dragging = true;
+
+                        root.drag_name = node;
+
+                        root.drag_x = 320;
+
+                        root.drag_y = 120;
+
+                        root.select_library_symbol(
+                            node);
+                    }
+                }
+
+                // DATABASE
+                NodeCategory {
+
+                    title: "Database";
+
+                    header_color: #8e24aa;
+
+                    nodes: ["MySQL", "Postgres", "MongoDB"];
+
+                    start_drag(node) => {
+
+                        root.is_dragging = true;
+
+                        root.drag_name = node;
+
+                        root.drag_x = 320;
+
+                        root.drag_y = 120;
+
+                        root.select_library_symbol(
+                            node);
+                    }
+                }
+
+                // NETWORK
+                NodeCategory {
+
+                    title: "Actions";
+
+                    header_color: #0c4b70;
+
+                    nodes: ["Delete Node", "Delete Wire", "Clear All", "Import Flow", "Export Flow"];
+
+                    start_drag(node) => {
+
+                        root.is_dragging = true;
+
+                        root.drag_name = node;
+
+                        root.drag_x = 320;
+
+                        root.drag_y = 120;
+
+                        root.select_library_symbol(
+                            node);
+                    }
+                }
+
+                Rectangle {
+                    height: 100%;
+                    background: transparent;
+                }
+
+                // ==================================================
+                // DELETE WIRE BUTTON
+                // ==================================================
+
+                Rectangle {
+
+                    height: 52px;
+
+                    border-radius: 6px;
+
+                    background: #ffebee;
+
+                    border-width: 1px;
+
+                    border-color: #ef5350;
+
+                    Button {
+
+                        text: "Delete Selected Wire";
+
+                        width: parent.width - 16px;
+
+                        height: 36px;
+
+                        x: 8px;
+                        y: 8px;
+
+                        clicked => {
+
+                            root.delete_selected_connection();
+                        }
+                    }
+                }
+            }
+        }
+
+        // ==================================================
+        // CANVAS
+        // ==================================================
+
+        Rectangle {
+
+            background: white;
+
+            // GRID
+            for i in 100: Rectangle {
+
+                x: i * 20px;
+
+                width: 1px;
+
+                background: #eeeeee;
+            }
+
+            for i in 60: Rectangle {
+
+                y: i * 20px;
+
+                height: 1px;
+
+                background: #eeeeee;
+            }
+
+            // ==================================================
+            // CANVAS TOUCH
+            // ==================================================
+
+            TouchArea {
+
+                moved => {
+
+                    if (root.is_dragging) {
+
+                        root.drag_x = self.mouse-x / 1px;
+
+                        root.drag_y = self.mouse-y / 1px;
+                    }
+                }
+
+                clicked => {
+
+                    // DROP NODE
+                    if (root.is_dragging) {
+
+                        root.place_symbol(
+                           
+                            root.drag_x,
+                            root.drag_y);
+
+                        root.is_dragging = false;
+                    } else if (root.selected_index != -1) {
+
+                        root.selected_index = -1;
+                    }
+                }
+            }
+            // ==================================================
+            // CONNECTIONS
+            // ==================================================
+
+            for conn[i] in root.connections: Rectangle {
+
+                x: 0;
+                y: 0;
+
+                width: parent.width;
+                height: parent.height;
+
+                background: transparent;
+
+                TouchArea {
+
+                    clicked => {
+
+                        root.select_connection(i);
+                    }
+                }
+
+                // Path {
+
+                //     stroke-width:
+                //         conn.selected
+                //         ? 4px
+                //         : 2px;
+
+                //     stroke:
+                //         conn.selected
+                //         ? red
+                //         : #0288d1;
+
+                //     commands: [
+
+                //         MoveTo {
+
+                //             x:
+                //                 root.all_symbols[
+                //                     conn.from_index
+                //                 ].x * 1px + 60px;
+
+                //             y:
+                //                 root.all_symbols[
+                //                     conn.from_index
+                //                 ].y * 1px;
+                //         },
+
+                //         LineTo {
+
+                //             x:
+                //                 root.all_symbols[
+                //                     conn.to_index
+                //                 ].x * 1px - 60px;
+
+                //             y:
+                //                 root.all_symbols[
+                //                     conn.from_index
+                //                 ].y * 1px;
+                //         },
+
+                //         LineTo {
+
+                //             x:
+                //                 root.all_symbols[
+                //                     conn.to_index
+                //                 ].x * 1px - 60px;
+
+                //             y:
+                //                 root.all_symbols[
+                //                     conn.to_index
+                //                 ].y * 1px;
+                //         }
+                //     ];
+                // }
+            }
+
+            // ==================================================
+            // NODES
+            // ==================================================
+
+            for item[i] in root.all_symbols: Rectangle {
+
+                x: item.x * 1px - 60px;
+
+                y: item.y * 1px - 20px;
+
+                width: 120px;
+
+                height: 40px;
+
+                if (root.selected_index == i):
+                Rectangle {
+
+                    border-width: 3px;
+
+                    border-radius: 5px;
+
+                    border-color: orange;
+                }
+
+                NodeSymbol {
+
+                    label: item.name;
+
+                    port_clicked(is_input) => {
+
+                        root.handle_port_click(
+                            i,
+                            is_input);
+                    }
+                }
+
+                TouchArea {
+
+                    width: 100%;
+                    height: 100%;
+
+                    clicked => {
+
+                        root.selected_index = i;
+                    }
+
+                    moved => {
+
+                        root.update_symbol_position(
+
+                            i,
+
+                            (self.mouse-x + parent.x + 60px) / 1px,
+
+                            (self.mouse-y + parent.y + 20px) / 1px);
+                    }
+                }
+            }
+        }
+    }
+}

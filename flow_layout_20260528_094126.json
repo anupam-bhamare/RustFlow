@@ -1,0 +1,23 @@
+{
+  "nodes": [
+    {
+      "id": "1",
+      "label": "Text",
+      "node_type": "ui_text",
+      "x_pos": 326.66666,
+      "y_pos": 108.0,
+      "value": "",
+      "bg_color": "#0d6efd"
+    },
+    {
+      "id": "2",
+      "label": "Button",
+      "node_type": "ui_button",
+      "x_pos": 511.3333,
+      "y_pos": 168.66667,
+      "value": "",
+      "bg_color": "#0d6efd"
+    }
+  ],
+  "wires": []
+}

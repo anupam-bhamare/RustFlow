@@ -1,0 +1,80 @@
+{
+  "nodes": [
+    {
+      "id": "1",
+      "label": "Text",
+      "node_type": "ui_text",
+      "x_pos": 133.33334,
+      "y_pos": 60.666668,
+      "value": "",
+      "bg_color": "#0d6efd"
+    },
+    {
+      "id": "2",
+      "label": "Button",
+      "node_type": "ui_button",
+      "x_pos": 282.0,
+      "y_pos": 96.666664,
+      "value": "",
+      "bg_color": "#0d6efd"
+    },
+    {
+      "id": "3",
+      "label": "Dropdown",
+      "node_type": "ui_dropdown",
+      "x_pos": 434.0,
+      "y_pos": 151.33333,
+      "value": "",
+      "bg_color": "#0d6efd"
+    },
+    {
+      "id": "4",
+      "label": "Text",
+      "node_type": "ui_text",
+      "x_pos": 575.3333,
+      "y_pos": 200.0,
+      "value": "",
+      "bg_color": "#0d6efd"
+    },
+    {
+      "id": "5",
+      "label": "Button",
+      "node_type": "ui_button",
+      "x_pos": 720.6667,
+      "y_pos": 250.0,
+      "value": "",
+      "bg_color": "#0d6efd"
+    },
+    {
+      "id": "6",
+      "label": "Dropdown",
+      "node_type": "ui_dropdown",
+      "x_pos": 868.0,
+      "y_pos": 310.66666,
+      "value": "",
+      "bg_color": "#0d6efd"
+    }
+  ],
+  "wires": [
+    {
+      "from": "node_1",
+      "to": "node_2"
+    },
+    {
+      "from": "node_2",
+      "to": "node_3"
+    },
+    {
+      "from": "node_3",
+      "to": "node_4"
+    },
+    {
+      "from": "node_4",
+      "to": "node_5"
+    },
+    {
+      "from": "node_5",
+      "to": "node_6"
+    }
+  ]
+}

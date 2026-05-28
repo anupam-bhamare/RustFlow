@@ -1,0 +1,28 @@
+{
+  "nodes": [
+    {
+      "id": "0",
+      "type": "ui_button",
+      "label": "Button",
+      "value": "",
+      "x_pos": 468.66666,
+      "y_pos": 143.33333,
+      "bg_color": "#0d6efd"
+    },
+    {
+      "id": "1",
+      "type": "ui_text",
+      "label": "Text",
+      "value": "",
+      "x_pos": 727.3333,
+      "y_pos": 200.0,
+      "bg_color": "#0d6efd"
+    }
+  ],
+  "wires": [
+    {
+      "from": "node_0",
+      "to": "node_1"
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "nodes": [
+    {
+      "id": "1",
+      "type": "ui_text",
+      "label": "Text",
+      "value": "",
+      "x_pos": 487.33334,
+      "y_pos": 105.33333,
+      "bg_color": "#0d6efd"
+    },
+    {
+      "id": "2",
+      "type": "ui_button",
+      "label": "Button",
+      "value": "",
+      "x_pos": 658.6667,
+      "y_pos": 178.66667,
+      "bg_color": "#0d6efd"
+    },
+    {
+      "id": "3",
+      "type": "ui_dropdown",
+      "label": "Dropdown",
+      "value": "",
+      "x_pos": 848.0,
+      "y_pos": 250.66666,
+      "bg_color": "#0d6efd"
+    }
+  ],
+  "wires": [
+    {
+      "from": "node_1",
+      "to": "node_2"
+    },
+    {
+      "from": "node_2",
+      "to": "node_3"
+    }
+  ]
+}

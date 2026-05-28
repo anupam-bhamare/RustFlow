@@ -1,0 +1,1438 @@
+import { Button } from "std-widgets.slint";
+
+export struct SymbolEntry {
+    name: string,
+    label: string,
+    value: string,
+    x: float,
+    y: float,
+    // Add these two missing fields:
+    node_type: string,
+    bg_color: string,
+}
+
+export struct Connection {
+    from_index: int,
+    to_index: int,
+    selected: bool,
+}
+struct LibraryItem {
+    name: string,      // What the user sees in the sidebar (e.g., "Dropdown")
+    node_type: string, // The fixed JSON backend type (e.g., "ui_dropdown")
+}
+
+// ======================================================
+// PALETTE NODE
+// ======================================================
+
+component PaletteNode inherits Rectangle {
+
+    in property <string> label;
+
+    callback drag_node();
+
+    height: 34px;
+
+    border-radius: 4px;
+
+    background: touch.has-hover ? #d7e3fc : #f1f3f4;
+
+    border-width: 1px;
+    border-color: #d0d0d0;
+
+    Text {
+
+        text: root.label;
+
+        color: #222;
+
+        x: 10px;
+
+        vertical-alignment: center;
+
+        height: parent.height;
+    }
+
+    touch := TouchArea {
+
+        mouse-cursor: grab;
+
+        moved => {
+
+            root.drag_node();
+        }
+    }
+}
+
+// ======================================================
+// CATEGORY
+// ======================================================
+
+component NodeCategory inherits Rectangle {
+
+    in property <string> title;
+
+    in property <brush> header_color;
+
+    in property <[string]> nodes;
+
+    in-out property <bool> expanded: true;
+
+    callback start_drag(string);
+
+    background: transparent;
+
+    VerticalLayout {
+
+        spacing: 4px;
+
+        // HEADER
+        Rectangle {
+
+            height: 36px;
+
+            border-radius: 6px;
+
+            background: root.header_color;
+
+            Text {
+
+                text: (root.expanded ? "▼ " : "▶ ") + root.title;
+
+                color: white;
+
+                font-weight: 700;
+
+                x: 10px;
+
+                vertical-alignment: center;
+
+                height: parent.height;
+            }
+
+            TouchArea {
+
+                clicked => {
+
+                    root.expanded = !root.expanded;
+                }
+            }
+        }
+
+        // NODES
+        if (root.expanded): VerticalLayout {
+
+            spacing: 4px;
+
+            for node in root.nodes: PaletteNode {
+
+                label: node;
+
+                drag_node => {
+
+                    root.start_drag(node);
+                }
+            }
+        }
+    }
+}
+
+
+component NodeSymbol inherits Rectangle {
+
+    callback port_clicked(bool);
+
+    in property <string> label: "Node";
+    in property <int> active_layout_mode:0;
+    width: 120px;
+    height: 40px;
+
+    background: #e1f5fe.with-alpha(0.5);
+
+    border-width: 1px;
+    border-color: #0288d1;
+    border-radius: 4px;
+
+    // INPUT PORT
+   if (root.active_layout_mode == 0 || root.active_layout_mode == 2): Rectangle {
+        x: -5px;
+        y: 15px;
+
+        width: 10px;
+        height: 10px;
+
+        border-radius: 5px;
+
+        background: input_touch.has-hover ? orange : #0288d1;
+
+        input_touch := TouchArea {
+
+            clicked => {
+                root.port_clicked(true);
+            }
+        }
+    }
+
+    // OUTPUT PORT
+ if (root.active_layout_mode == 0 || root.active_layout_mode == 2): Rectangle {
+
+        x: 115px;
+        y: 15px;
+
+        width: 10px;
+        height: 10px;
+
+        border-radius: 5px;
+
+        background: output_touch.has-hover ? orange : #0288d1;
+
+        output_touch := TouchArea {
+
+            clicked => {
+                root.port_clicked(false);
+            }
+        }
+    }
+    if (root.active_layout_mode == 1 || root.active_layout_mode == 2): Rectangle {
+
+        x: (parent.width / 2) - 4px;
+        y: -4px;
+
+        width: 10px;
+        height: 10px;
+
+        border-radius: 5px;
+
+        background: top_touch.has-hover ? orange : #0288d1;
+
+        top_touch := TouchArea {
+
+            clicked => {
+                root.port_clicked(false);
+            }
+        }
+    }
+    if (root.active_layout_mode == 1 || root.active_layout_mode == 2): Rectangle {
+
+        x: (parent.width / 2) - 4px;
+        y: parent.height - 4px;
+
+        width: 10px;
+        height: 10px;
+
+        border-radius: 5px;
+
+        background: bottom_touch.has-hover ? orange : #0288d1;
+
+        bottom_touch := TouchArea {
+
+            clicked => {
+                root.port_clicked(false);
+            }
+        }
+    }
+    Text {
+
+        text: root.label;
+
+        color: rgb(40, 40, 50);
+
+        width: 100%;
+
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+export component AppWindow inherits Window {
+
+    preferred-width: 1280px;
+    preferred-height: 720px;
+
+    min-height: 720px;
+    in-out property <int> active_layout_mode: 0;
+
+    // Keep your menu callbacks if needed for Rust logic, but the UI state handles instantly here!
+    callback vertical_layout();
+    callback horizontal_layout();
+
+    in-out property <bool> show_alert: false;
+    in-out property <string> alert_message: "";
+
+    public function trigger_alert(msg: string) {
+        root.alert_message = msg;
+        root.show_alert = true;
+    }
+    property <bool> common_expanded: false;
+    property <bool> function_expanded: false;
+    property <bool> parser_expanded: false;
+    property <bool> storage_expanded: false;
+    property <bool> dashboard_expanded: false;
+    property <bool> network_expanded: false;
+    property <bool> actions_expanded: false;
+    property <bool> layout_expanded: false;
+    in-out property <[SymbolEntry]> all_symbols: [];
+
+    in-out property <[Connection]> connections: [];
+
+    in-out property <int> selected_index: -1;
+
+    property <bool> prevent_placement: false;
+
+    // =========================
+    // DRAG & DROP STATE
+    // =========================
+
+    in-out property <bool> is_dragging: false;
+
+    in-out property <string> drag_name: "";
+    in-out property <string> drag_type: "";
+    in-out property <string> bg_color: "";
+    in-out property <float> drag_x: 0;
+    in-out property <float> drag_y: 0;
+    in-out property <bool> show_node_modal: false;
+
+    in-out property <string> edit_label: "";
+
+    in-out property <string> edit_value: "";
+
+    in-out property <int> editing_index: -1;
+
+    callback save_node_properties(int, string, string);
+
+    // =========================
+    // CALLBACKS
+    // =========================
+
+    callback select_library_symbol(string);
+
+    callback place_symbol(string, string, string, float, float);
+
+    callback update_symbol_position(int, float, float);
+
+    callback delete_selected_symbol();
+
+    callback clear_canvas();
+
+    callback import_xml();
+
+    callback handle_port_click(int, bool);
+
+    callback select_connection(int);
+
+    callback delete_selected_connection();
+    callback save_flow();
+    callback load_flow();
+
+    HorizontalLayout {
+
+        // =========================
+        // SIDEBAR
+        // =========================
+
+        Rectangle {
+
+            width: 260px;
+
+            background: #f7f7f7;
+
+            border-width: 1px;
+
+            border-color: #dcdcdc;
+
+            VerticalLayout {
+
+                padding: 12px;
+
+                spacing: 10px;
+
+                // ====================================
+// COMMON CATEGORY
+// ====================================
+
+Rectangle {
+
+                    height: 36px;
+
+                    background: rgb(166, 187, 207);
+
+                    border-radius: 4px;
+
+                    Text {
+
+                        text: (root.common_expanded ? "▼ " : "▶ ") + "Common";
+
+                        color: white;
+
+                        font-weight: 700;
+
+                        x: 10px;
+
+                        vertical-alignment: center;
+
+                        height: parent.height;
+                    }
+
+                    TouchArea {
+
+                        clicked => {
+
+                            let was_open = root.common_expanded;
+
+                            root.common_expanded = false;
+                            root.function_expanded = false;
+                            root.network_expanded = false;
+                            root.actions_expanded = false;
+                            root.dashboard_expanded = false;
+                            root.storage_expanded = false;
+                            root.parser_expanded = false;
+                            root.layout_expanded = false;
+                            root.common_expanded = !was_open;
+                        }
+                    }
+                }
+
+                if (root.common_expanded): VerticalLayout {
+
+                    spacing: 6px;
+
+                    for node in [
+                        { name: "Text", node_type: "ui_text" },
+                        { name: "Button", node_type: "ui_button" },
+                        { name: "Dropdown", node_type: "ui_dropdown" }
+                    ]: Rectangle {
+
+                        height: 35px;
+
+                        background: common-touch.has-hover ? #e2dfed : #edebf4;
+                        border-radius: 4px;
+                        animate background { duration: 150ms; }
+
+                        Text {
+
+                            text: node.name;
+
+                            color: black;
+
+                            x: 10px;
+
+                            vertical-alignment: center;
+
+                            height: parent.height;
+                        }
+
+                        common-touch := TouchArea {
+
+                            moved => {
+
+                                root.is_dragging = true;
+
+                                root.drag_name = node.name;
+                                root.drag_type = node.node_type;
+
+                                root.select_library_symbol(node.name);
+
+                                root.drag_x = (self.mouse-x + parent.x) / 1px;
+
+                                root.drag_y = (self.mouse-y + parent.y) / 1px;
+                            }
+                        }
+                    }
+                }
+                Rectangle {
+
+                    height: 36px;
+
+                    background: rgb(253, 208, 162);
+
+                    border-radius: 4px;
+
+                    Text {
+
+                        text: (root.function_expanded ? "▼ " : "▶ ") + "Function";
+
+                        color: white;
+
+                        x: 10px;
+
+                        vertical-alignment: center;
+
+                        height: parent.height;
+                    }
+
+                    TouchArea {
+
+                        clicked => {
+
+                            let was_open = root.function_expanded;
+
+                            root.common_expanded = false;
+                            root.function_expanded = false;
+                            root.network_expanded = false;
+                            root.actions_expanded = false;
+                            root.dashboard_expanded = false;
+                            root.storage_expanded = false;
+                            root.parser_expanded = false;
+                            root.layout_expanded = false;
+
+                            root.function_expanded = !was_open;
+                        }
+                    }
+                }
+
+                if (root.function_expanded): VerticalLayout {
+
+                    spacing: 6px;
+
+                    for node in ["Switch", "Change", "Range", "Delay", "Trigger"]: Rectangle {
+
+                        height: 35px;
+
+                        background: function-touch.has-hover ? #e2dfed : #edebf4;
+                        border-radius: 4px;
+                        animate background { duration: 150ms; }
+
+                        Text {
+
+                            text: node;
+
+                            color: black;
+
+                            x: 10px;
+
+                            vertical-alignment: center;
+
+                            height: parent.height;
+                        }
+
+                        function_touch := TouchArea {
+
+                            moved => {
+
+                                root.is_dragging = true;
+
+                                root.drag_name = node;
+
+                                root.select_library_symbol(node);
+
+                                root.drag_x = (self.mouse-x + parent.x) / 1px;
+
+                                root.drag_y = (self.mouse-y + parent.y) / 1px;
+                            }
+                        }
+                    }
+                }
+                Rectangle {
+
+                    height: 36px;
+
+                    background: rgb(222, 189, 92);
+
+                    border-radius: 4px;
+
+                    Text {
+
+                        text: (root.parser_expanded ? "▼ " : "▶ ") + "Parser";
+
+                        color: white;
+
+                        font-weight: 700;
+
+                        x: 10px;
+
+                        vertical-alignment: center;
+
+                        height: parent.height;
+                    }
+
+                    TouchArea {
+
+                        clicked => {
+
+                            let was_open = root.parser_expanded;
+
+                            root.common_expanded = false;
+                            root.function_expanded = false;
+                            root.network_expanded = false;
+                            root.actions_expanded = false;
+                            root.dashboard_expanded = false;
+                            root.storage_expanded = false;
+                            root.parser_expanded = false;
+                            root.layout_expanded = false;
+
+                            root.parser_expanded = !was_open;
+                        }
+                    }
+                }
+
+                if (root.parser_expanded): VerticalLayout {
+
+                    spacing: 6px;
+
+                    for node in ["Json", "Xml", "Csv", "Html"]: Rectangle {
+
+                        height: 35px;
+
+                        background: parser-touch.has-hover ? #e2dfed : #edebf4;
+                        border-radius: 4px;
+                        animate background { duration: 150ms; }
+
+                        Text {
+
+                            text: node;
+
+                            color: black;
+
+                            x: 10px;
+
+                            vertical-alignment: center;
+
+                            height: parent.height;
+                        }
+
+                        parser_touch := TouchArea {
+
+                            moved => {
+
+                                root.is_dragging = true;
+
+                                root.drag_name = node;
+
+                                root.select_library_symbol(node);
+
+                                root.drag_x = (self.mouse-x + parent.x) / 1px;
+
+                                root.drag_y = (self.mouse-y + parent.y) / 1px;
+                            }
+                        }
+                    }
+                }
+                Rectangle {
+
+                    height: 36px;
+
+                    background: burlywood;
+
+                    border-radius: 4px;
+
+                    Text {
+
+                        text: (root.storage_expanded ? "▼ " : "▶ ") + "Storage";
+
+                        color: white;
+
+                        x: 10px;
+
+                        vertical-alignment: center;
+
+                        height: parent.height;
+                    }
+
+                    TouchArea {
+
+                        clicked => {
+
+                            let was_open = root.storage_expanded;
+
+                            root.common_expanded = false;
+                            root.function_expanded = false;
+                            root.network_expanded = false;
+                            root.actions_expanded = false;
+                            root.dashboard_expanded = false;
+                            root.storage_expanded = false;
+                            root.parser_expanded = false;
+                            root.layout_expanded = false;
+
+                            root.storage_expanded = !was_open;
+                        }
+                    }
+                }
+
+                if (root.storage_expanded): VerticalLayout {
+
+                    spacing: 6px;
+
+                    for node in ["Text", "Button", "Dropdown"]: Rectangle {
+
+                        height: 35px;
+
+                        background: storage-touch.has-hover ? #e2dfed : #edebf4;
+                        border-radius: 4px;
+                        animate background { duration: 150ms; }
+
+                        Text {
+
+                            text: node;
+
+                            color: black;
+
+                            x: 10px;
+
+                            vertical-alignment: center;
+
+                            height: parent.height;
+                        }
+
+                        storage_touch := TouchArea {
+
+                            moved => {
+
+                                root.is_dragging = true;
+
+                                root.drag_name = node;
+
+                                root.select_library_symbol(node);
+
+                                root.drag_x = (self.mouse-x + parent.x) / 1px;
+
+                                root.drag_y = (self.mouse-y + parent.y) / 1px;
+                            }
+                        }
+                    }
+                }
+                // ====================================
+// DASHBOARD CATEGORY
+// ====================================
+
+Rectangle {
+
+                    height: 36px;
+
+                    background: rgb(119, 198, 204);
+
+                    border-radius: 4px;
+
+                    Text {
+
+                        text: (root.dashboard_expanded ? "▼ " : "▶ ") + "Dashboard";
+
+                        color: white;
+
+                        x: 10px;
+
+                        vertical-alignment: center;
+
+                        height: parent.height;
+                    }
+
+                    TouchArea {
+
+                        clicked => {
+
+                            let was_open = root.dashboard_expanded;
+
+                            root.common_expanded = false;
+                            root.function_expanded = false;
+                            root.network_expanded = false;
+                            root.actions_expanded = false;
+                            root.dashboard_expanded = false;
+                            root.storage_expanded = false;
+                            root.parser_expanded = false;
+                            root.layout_expanded = false;
+
+                            root.dashboard_expanded = !was_open;
+                        }
+                    }
+                }
+
+                if (root.dashboard_expanded): VerticalLayout {
+
+                    spacing: 6px;
+
+                    for node in ["Chart", "Gauge", "Slider"]: Rectangle {
+
+                        height: 35px;
+
+                        background: dashboard-touch.has-hover ? #e2dfed : #edebf4;
+                        border-radius: 4px;
+                        animate background { duration: 150ms; }
+
+                        Text {
+
+                            text: node;
+
+                            color: #222;
+
+                            x: 10px;
+
+                            vertical-alignment: center;
+
+                            height: parent.height;
+                        }
+
+                        dashboard_touch := TouchArea {
+
+                            moved => {
+
+                                root.is_dragging = true;
+
+                                root.drag_name = node;
+
+                                root.select_library_symbol(node);
+
+                                root.drag_x = (self.mouse-x + parent.x) / 1px;
+
+                                root.drag_y = (self.mouse-y + parent.y) / 1px;
+                            }
+                        }
+                    }
+                }
+
+                // ====================================
+// NETWORK CATEGORY
+// ====================================
+
+Rectangle {
+
+                    height: 36px;
+
+                    background: rgb(215, 215, 160);
+
+                    border-radius: 4px;
+
+                    Text {
+
+                        text: (root.network_expanded ? "▼ " : "▶ ") + "Network";
+
+                        color: white;
+
+                        font-weight: 700;
+
+                        x: 10px;
+
+                        vertical-alignment: center;
+
+                        height: parent.height;
+                    }
+
+                    TouchArea {
+
+                        clicked => {
+
+                            let was_open = root.network_expanded;
+
+                            root.common_expanded = false;
+                            root.function_expanded = false;
+                            root.network_expanded = false;
+                            root.actions_expanded = false;
+                            root.dashboard_expanded = false;
+                            root.storage_expanded = false;
+                            root.parser_expanded = false;
+                            root.layout_expanded = false;
+
+                            root.network_expanded = !was_open;
+                        }
+                    }
+                }
+
+                if (root.network_expanded): VerticalLayout {
+
+                    spacing: 6px;
+
+                    for node in ["MQTT", "HTTP", "TCP"]: Rectangle {
+
+                        height: 35px;
+
+                        background: network-touch.has-hover ? #e2dfed : #edebf4;
+                        border-radius: 4px;
+                        animate background { duration: 150ms; }
+                        Text {
+
+                            text: node;
+
+                            color: #222;
+
+                            x: 10px;
+
+                            vertical-alignment: center;
+
+                            height: parent.height;
+                        }
+
+                        network_touch := TouchArea {
+
+                            moved => {
+
+                                root.is_dragging = true;
+
+                                root.drag_name = node;
+
+                                root.select_library_symbol(node);
+
+                                root.drag_x = (self.mouse-x + parent.x) / 1px;
+
+                                root.drag_y = (self.mouse-y + parent.y) / 1px;
+                            }
+                        }
+                    }
+                }
+                Rectangle {
+
+                    height: 36px;
+
+                    background: #edd1d1;
+                    Text {
+
+                        text: (root.actions_expanded ? "▼ " : "▶ ") + "Actions";
+
+                        color: white;
+
+                        x: 10px;
+
+                        vertical-alignment: center;
+
+                        height: parent.height;
+                    }
+
+                    TouchArea {
+
+                        clicked => {
+
+                            let was_open = root.actions_expanded;
+
+                            root.common_expanded = false;
+                            root.function_expanded = false;
+                            root.network_expanded = false;
+                            root.actions_expanded = false;
+                            root.dashboard_expanded = false;
+                            root.storage_expanded = false;
+                            root.parser_expanded = false;
+                            root.layout_expanded = false;
+
+                            root.actions_expanded = !was_open;
+                        }
+                    }
+                }
+
+                if (root.actions_expanded): VerticalLayout {
+
+                    spacing: 6px;
+
+                    for node in ["Delete Node", "Delete Wire", "Clear All", "Save Flow", "Load Flow"]: Rectangle {
+
+                        height: 35px;
+                        background: actions-touch.has-hover ? #e2dfed : #edebf4;
+                        border-radius: 4px;
+                        animate background { duration: 150ms; }
+
+                        Text {
+
+                            text: node;
+
+                            color: #222;
+
+                            x: 10px;
+
+                            vertical-alignment: center;
+
+                            height: parent.height;
+                        }
+
+                        actions-touch := TouchArea {
+
+                            clicked => {
+
+                                if (node == "Delete Wire") {
+
+                                    root.delete_selected_connection();
+                                } else if (node == "Delete Node") {
+
+           // root.delete_selected_symbol();
+
+        } else if (node == "Save Flow") {
+
+                                    root.save_flow();
+                                } else if (node == "Load Flow") {
+
+                                    root.load_flow();
+                                } else if (node == "Clear All") {
+
+           // root.clear_canvas();
+
+        } else {
+
+            // NORMAL DRAGGABLE NODES
+
+            root.is_dragging = true;
+
+                                    root.drag_name = node;
+
+                                    root.select_library_symbol(node);
+                                }
+                            }
+                        }
+                    }
+                }
+                Rectangle {
+                    height: 36px;
+                    background: #266df2;
+                    border-radius: 4px;
+                    Text {
+                        text: (root.layout_expanded ? "▼ " : "▶ ") + "Layout";
+                        color: white;
+                        x: 10px;
+                        vertical-alignment: center;
+                        height: parent.height;
+                    }
+
+                    TouchArea {
+                        clicked => {
+                            let was_open = root.layout_expanded;
+                            root.common_expanded = false;
+                            root.function_expanded = false;
+                            root.network_expanded = false;
+                            root.actions_expanded = false;
+                            root.dashboard_expanded = false;
+                            root.storage_expanded = false;
+                            root.parser_expanded = false;
+                            root.layout_expanded = false;
+                            root.layout_expanded = !was_open;
+                        }
+                    }
+                }
+
+                if (root.layout_expanded): VerticalLayout {
+                    spacing: 6px;
+                    for node in ["Horizontal", "Vertical", "Both"]: Rectangle {
+                        height: 35px;
+                        background: layout-touch.has-hover ? #e2dfed : #edebf4;
+                        border-radius: 4px;
+                        animate background { duration: 150ms; }
+
+                        Text {
+                            text: node;
+                            color: #222;
+                            x: 10px;
+                            vertical-alignment: center;
+                            height: parent.height;
+                        }
+
+                        layout-touch := TouchArea {
+                            clicked => {
+                                if (node == "Horizontal") {
+                                    root.active_layout_mode = 0;
+                                    root.horizontal_layout();
+                                } else if (node == "Vertical") {
+                                    root.active_layout_mode = 1;
+                                    root.vertical_layout();
+                                } else if (node == "Both") {
+                                    root.active_layout_mode = 2;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // =========================
+        // CANVAS
+        // =========================
+
+        Rectangle {
+
+            background: white;
+
+            // Dynamically calculate vertical lines to fill the width
+    for i in Math.ceil(parent.width / 15px): Rectangle {
+                x: i * 15px;
+                width: 0.5px;
+                background: #e0e0e0;
+            }
+
+            // Dynamically calculate horizontal lines to fill the height
+    for i in Math.ceil(parent.height / 15px): Rectangle {
+                y: i * 15px;
+                height: 0.5px;
+                background: #e0e0e0;
+            }
+
+            // =========================
+            // CANVAS TOUCH
+            // =========================
+
+            TouchArea {
+
+                moved => {
+
+                    if (root.is_dragging) {
+
+                        root.drag_x = self.mouse-x / 1px;
+
+                        root.drag_y = self.mouse-y / 1px;
+                    }
+                }
+
+                clicked => {
+
+                    // DROP NODE
+                    if (root.is_dragging) {
+
+                        root.place_symbol(
+                        root.drag_name,  // 1. name (string)
+                        root.drag_type,  // 2. node_type (string)
+                        "#0d6efd",       // 3. bg_color (string) -> Pass your target color string hex here!
+                        root.drag_x,     // 4. x coordinate (float)
+                        root.drag_y      // 5. y coordinate (float)
+                    );
+
+                        root.is_dragging = false;
+                    } else if (root.selected_index != -1) {
+
+                        root.selected_index = -1;
+                    }
+                }
+            }
+
+            // =========================
+            // DRAG PREVIEW
+            // =========================
+
+            if (root.is_dragging): Rectangle {
+
+                x: root.drag_x * 1px - 60px;
+
+                y: root.drag_y * 1px - 20px;
+
+                width: 120px;
+
+                height: 40px;
+
+                opacity: 0.5;
+
+                NodeSymbol {
+
+                    label: root.drag_name;
+                    active_layout_mode: root.active_layout_mode;
+                }
+            }
+
+            // =========================
+            // NODES
+            // =========================
+
+            for item[i] in root.all_symbols: Rectangle {
+                z: 2;
+
+                x: item.x * 1px - 60px;
+
+                y: item.y * 1px - 20px;
+
+                width: 120px;
+
+                height: 40px;
+
+                if (root.selected_index == i): Rectangle {
+
+                    border-width: 3px;
+
+                    border-radius: 4px;
+
+                    border-color: #0288d1;
+                }
+
+                NodeSymbol {
+
+                    label: item.label == "" ? item.name : item.label;
+
+                    port_clicked(is_input) => {
+
+                        root.handle_port_click(
+                            i,
+                            is_input);
+                    }
+                }
+
+                TouchArea {
+
+                    width: 100%;
+
+                    height: 100%;
+
+                    double-clicked => {
+
+                        root.selected_index = i;
+
+                        root.prevent_placement = true;
+
+                        root.editing_index = i;
+
+                        root.edit_label = item.label;
+
+                        root.edit_value = item.value;
+
+                        root.show_node_modal = true;
+                    }
+
+                    moved => {
+
+                        root.update_symbol_position(
+                            i,
+                            (self.mouse-x + parent.x + 60px) / 1px,
+
+                            (self.mouse-y + parent.y + 20px) / 1px);
+                    }
+                }
+            }
+
+            // =========================
+            // CONNECTIONS
+            // =========================
+for conn[index] in root.connections: Rectangle {
+
+                // =====================================
+    // SOURCE / TARGET (Global Space)
+    // =====================================
+    property <float> sx: root.all_symbols[conn.from_index].x + 60;
+                property <float> sy: root.all_symbols[conn.from_index].y + 2;
+
+                property <float> tx: root.all_symbols[conn.to_index].x - 60;
+                property <float> ty: root.all_symbols[conn.to_index].y + 2;
+
+                // =====================================
+    // LOCAL RECT BOUNDING BOX
+    // =====================================
+    property <float> left: Math.min(sx, tx);
+                property <float> top: Math.min(sy, ty);
+
+                // 120px padding prevents the sweeping loops from getting clipped at the borders
+    property <float> pad: 120;
+
+                property <float> pw: Math.max(Math.abs(tx - sx), 1) + (pad * 2);
+                property <float> ph: Math.max(Math.abs(ty - sy), 1) + (pad * 2);
+
+                x: (left - pad) * 1px;
+                y: (top - pad) * 1px;
+                width: pw * 1px;
+                height: ph * 1px;
+                background: transparent;
+
+                // Keeps wires layered underneath nodes so nodes remain clickable
+    z: 1;
+
+                // =====================================
+    // PATH ROUTING
+    // =====================================
+    Path {
+                    width: parent.width;
+                    height: parent.height;
+
+                    viewbox-x: 0;
+                    viewbox-y: 0;
+                    viewbox-width: pw;
+                    viewbox-height: ph;
+
+                    fill: transparent;
+                    stroke: conn.selected ? red : #0288d1;
+                    stroke-width: 1.5px;
+
+     // =====================================
+        // GAP-BOUNDED REVERSE LOOP LOGIC
+        // =====================================
+// =====================================
+        // PERFECT S-LOOP REVERSE ROUTING
+        // =====================================
+        property <bool> is_forward: tx >= sx;
+        property <bool> is_downward: ty >= sy;
+
+        // X-axis handle extension: Pushes out far to form the side loops
+        property <float> curve_x: is_forward ? Math.min(Math.abs(tx - sx) / 2, 40) : 180;
+        
+        // Y-axis handle separation: Adds vertical tension when nodes are reversed
+        property <float> curve_y: is_forward ? 0 : 80;
+
+        property <float> local_sx: sx - left + pad;
+        property <float> local_sy: sy - top + pad;
+        property <float> local_tx: tx - left + pad;
+        property <float> local_ty: ty - top + pad;
+
+        MoveTo {
+            x: local_sx;
+            y: local_sy;
+        }
+
+        CubicTo {
+            // Control 1: Shoots rightward, then curves down/up following the layout flow
+            control-1-x: local_sx + curve_x;
+            control-1-y: local_sy + (is_downward ? curve_y : -curve_y);
+
+            // Control 2: Shoots leftward, then curves in the OPPOSITE vertical direction to Control 1
+            // This inversion is what snaps it from a rigid C-loop into a flawless S-loop!
+            control-2-x: local_tx - curve_x;
+            control-2-y: local_ty + (is_downward ? -curve_y : curve_y);
+
+            x: local_tx;
+            y: local_ty;
+        }
+    }
+
+                TouchArea {
+                    width: parent.width;
+                    height: parent.height;
+                    clicked => {
+                        root.select_connection(index);
+                    }
+                }
+            }
+            if (root.show_node_modal): Rectangle {
+                width: parent.width;
+                height: parent.height;
+                background: #00000088;
+
+                // Blocks background clicks from passing through to the node canvas below
+    TouchArea { }
+
+                Rectangle {
+                    width: 360px;
+                    height: 260px; // Increased height slightly to accommodate the new input box wrappers
+        x: (parent.width - self.width) / 2;
+                    y: (parent.height - self.height) / 2;
+                    background: white;
+                    border-radius: 8px;
+                    border-width: 1px;
+                    border-color: #cccccc;
+
+                    VerticalLayout {
+                        padding: 16px;
+                        spacing: 12px;
+
+                        Text {
+                            text: "Edit Node";
+                            font-size: 20px;
+                            font-weight: 700;
+                            color: #222;
+                        }
+
+                        // --- LABEL INPUT ---
+            Text {
+                            text: "Label";
+                            font-weight: 600;
+                            color: #444;
+                        }
+
+                        // This wrapper creates the visible text box area
+            Rectangle {
+                            background: #fcfcfc;
+                            border-width: 1px;
+                            border-color: #cccccc;
+                            border-radius: 4px;
+                            height: 32px; // Gives a clear, clickable 32px tall target area
+                
+                TextInput {
+                                text <=> root.edit_label;
+                                font-size: 14px;
+                                x: 6px; // Offsets the text slightly from the left border edge
+                    vertical-alignment: center;
+                            }
+                        }
+
+                        // --- VALUE INPUT ---
+            Text {
+                            text: "Value";
+                            font-weight: 600;
+                            color: #444;
+                        }
+
+                        // This wrapper creates the second visible text box area
+            Rectangle {
+                            background: #fcfcfc;
+                            border-width: 1px;
+                            border-color: #cccccc;
+                            border-radius: 4px;
+                            height: 32px;
+
+                            TextInput {
+                                text <=> root.edit_value;
+                                font-size: 14px;
+                                x: 6px;
+                                vertical-alignment: center;
+                            }
+                        }
+
+                        // Flexible empty space to push the buttons neatly to the bottom edge
+            Rectangle { }
+
+                        // --- DIALOG BUTTONS ---
+            HorizontalLayout {
+                            spacing: 10px;
+                            height: 36px;
+
+                            Button {
+                                text: "Save";
+                                clicked => {
+                                    root.save_node_properties(
+                            root.editing_index,
+                            root.edit_label,
+                            root.edit_value);
+                                    root.show_node_modal = false;
+                                }
+                            }
+
+                            Button {
+                                text: "Close";
+                                clicked => {
+                                    root.show_node_modal = false;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (root.show_alert): Rectangle {
+                width: parent.width;
+                height: parent.height;
+                background: #00000044; // Tinted overlay dimming the canvas background
+        
+        // Block mouse interactions from leaking down to the node editor canvas
+        TouchArea { }
+
+                Rectangle {
+                    width: 320px;
+                    height: 160px;
+                    background: white;
+                    border-radius: 8px;
+                    border-width: 1px;
+                    border-color: #dddddd;
+
+                    // Subtle drop shadow effect using nested borders
+            clip: true;
+
+                    VerticalLayout {
+                        padding: 20px;
+                        spacing: 15px;
+
+                        Text {
+                            text: "Notification";
+                            font-size: 16px;
+                            font-weight: 700;
+                            color: #333333;
+                        }
+
+                        Text {
+                            text: root.alert_message;
+                            font-size: 13px;
+                            color: #555555;
+                            wrap: word-wrap;
+                        }
+
+                        // Push down the close button
+                Rectangle { }
+
+                        HorizontalLayout {
+                            alignment: end;
+                            Button {
+                                text: "OK";
+                                width: 70px;
+                                height: 30px;
+                                clicked => {
+                                    root.show_alert = false;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
