@@ -18,12 +18,14 @@ pub struct JsonNode {
     pub y_pos: f32,
     pub value: String,
     pub bg_color: String,
+    pub creation_mode: i32,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 pub struct JsonWire {
     pub from: String,
     pub to: String,
+    layout_mode: i32
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
@@ -73,7 +75,7 @@ fn main() -> Result<(), slint::PlatformError> {
         let place_model = symbols_model.clone();
         let place_tool = current_tool.clone();
         let ui_weak = ui.as_weak();
-ui.on_place_symbol(move |name, node_type, bg_color, x, y| {
+ui.on_place_symbol(move |name, node_type, bg_color, x, y,mode| {
             place_model.push(SymbolEntry {
                 name: name.clone(),
                 label: name.clone(),
@@ -82,6 +84,7 @@ ui.on_place_symbol(move |name, node_type, bg_color, x, y| {
                 x,                        // Maps cleanly from argument #4
                 y,                        // Maps cleanly from argument #5
                 value: "".into(),
+                creation_mode:mode
             });
         });
     }
@@ -155,6 +158,7 @@ ui.on_place_symbol(move |name, node_type, bg_color, x, y| {
                                 y,
                                 value: value.into(),
                                 bg_color: "#0d6efd".into(),
+                                creation_mode:0
                             });
                         }
                     }
@@ -177,7 +181,7 @@ ui.on_place_symbol(move |name, node_type, bg_color, x, y| {
         let conn_model = connections.clone();
         let wire_source = wire_source.clone();
 
-        move |node_index, is_input| {
+        move |node_index, is_input,mode| {
             if !is_input {
                 wire_source.set(node_index);
                 println!("Selected source node: {}", node_index);
@@ -189,6 +193,7 @@ ui.on_place_symbol(move |name, node_type, bg_color, x, y| {
                         from_index: source,
                         to_index: node_index,
                         selected: false,
+                        creation_mode:mode
                     });
                     println!("Connected {} -> {}", source, node_index);
                 }
@@ -275,6 +280,7 @@ ui.on_place_symbol(move |name, node_type, bg_color, x, y| {
                         y_pos: item.y,
                         value: item.value.to_string(),
                         bg_color: if item.bg_color.is_empty() { "#0d6efd".to_string() } else { item.bg_color.to_string() },
+                        creation_mode: item.creation_mode,
                     });
                 }
             }
@@ -286,6 +292,7 @@ ui.on_place_symbol(move |name, node_type, bg_color, x, y| {
                     json_wires.push(JsonWire {
                         from: format!("node_{}", conn.from_index + 1),
                         to: format!("node_{}", conn.to_index + 1),
+                        layout_mode: conn.creation_mode,
                     });
                 }
             }
@@ -388,6 +395,7 @@ ui.on_place_symbol(move |name, node_type, bg_color, x, y| {
                     y: node.y_pos,
                     value: node.value.into(),
                     bg_color: node.bg_color.into(),
+                    creation_mode: node.creation_mode,
                 });
             }
 
@@ -400,7 +408,8 @@ ui.on_place_symbol(move |name, node_type, bg_color, x, y| {
                     fresh_connections.push(Connection {
                         from_index: from_val - 1,
                         to_index: to_val - 1,
-                        selected: false, // <-- FIXED: Added the missing field initialization
+                        selected: false, 
+                        creation_mode:wire.layout_mode// <-- FIXED: Added the missing field initialization
                     });
                 }
             }

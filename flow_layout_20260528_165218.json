@@ -1,0 +1,54 @@
+{
+  "nodes": [
+    {
+      "id": "1",
+      "label": "Text",
+      "node_type": "ui_text",
+      "x_pos": 401.33334,
+      "y_pos": 119.33333,
+      "value": "",
+      "bg_color": "#0d6efd",
+      "creation_mode": 0
+    },
+    {
+      "id": "2",
+      "label": "Button",
+      "node_type": "ui_button",
+      "x_pos": 656.0,
+      "y_pos": 264.66666,
+      "value": "",
+      "bg_color": "#0d6efd",
+      "creation_mode": 0
+    },
+    {
+      "id": "3",
+      "label": "Text",
+      "node_type": "ui_text",
+      "x_pos": 468.66666,
+      "y_pos": 348.0,
+      "value": "",
+      "bg_color": "#0d6efd",
+      "creation_mode": 1
+    },
+    {
+      "id": "4",
+      "label": "Button",
+      "node_type": "ui_button",
+      "x_pos": 601.3333,
+      "y_pos": 479.3333,
+      "value": "",
+      "bg_color": "#0d6efd",
+      "creation_mode": 1
+    }
+  ],
+  "wires": [
+    {
+      "from": "node_1",
+      "to": "node_2"
+    },
+    {
+      "from": "node_3",
+      "to": "node_4"
+    }
+  ]
+}

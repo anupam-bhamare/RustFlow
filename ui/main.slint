@@ -9,133 +9,26 @@ export struct SymbolEntry {
     // Add these two missing fields:
     node_type: string,
     bg_color: string,
+    creation_mode: int,
 }
 
 export struct Connection {
     from_index: int,
     to_index: int,
     selected: bool,
+    creation_mode: int,
 }
 struct LibraryItem {
     name: string,      // What the user sees in the sidebar (e.g., "Dropdown")
     node_type: string, // The fixed JSON backend type (e.g., "ui_dropdown")
 }
 
-// ======================================================
-// PALETTE NODE
-// ======================================================
 
-component PaletteNode inherits Rectangle {
-
-    in property <string> label;
-
-    callback drag_node();
-
-    height: 34px;
-
-    border-radius: 4px;
-
-    background: touch.has-hover ? #d7e3fc : #f1f3f4;
-
-    border-width: 1px;
-    border-color: #d0d0d0;
-
-    Text {
-
-        text: root.label;
-
-        color: #222;
-
-        x: 10px;
-
-        vertical-alignment: center;
-
-        height: parent.height;
-    }
-
-    touch := TouchArea {
-
-        mouse-cursor: grab;
-
-        moved => {
-
-            root.drag_node();
-        }
-    }
-}
 
 // ======================================================
 // CATEGORY
 // ======================================================
 
-component NodeCategory inherits Rectangle {
-
-    in property <string> title;
-
-    in property <brush> header_color;
-
-    in property <[string]> nodes;
-
-    in-out property <bool> expanded: true;
-
-    callback start_drag(string);
-
-    background: transparent;
-
-    VerticalLayout {
-
-        spacing: 4px;
-
-        // HEADER
-        Rectangle {
-
-            height: 36px;
-
-            border-radius: 6px;
-
-            background: root.header_color;
-
-            Text {
-
-                text: (root.expanded ? "▼ " : "▶ ") + root.title;
-
-                color: white;
-
-                font-weight: 700;
-
-                x: 10px;
-
-                vertical-alignment: center;
-
-                height: parent.height;
-            }
-
-            TouchArea {
-
-                clicked => {
-
-                    root.expanded = !root.expanded;
-                }
-            }
-        }
-
-        // NODES
-        if (root.expanded): VerticalLayout {
-
-            spacing: 4px;
-
-            for node in root.nodes: PaletteNode {
-
-                label: node;
-
-                drag_node => {
-
-                    root.start_drag(node);
-                }
-            }
-        }
-    }
-}
 
 
 component NodeSymbol inherits Rectangle {
@@ -143,102 +36,84 @@ component NodeSymbol inherits Rectangle {
     callback port_clicked(bool);
 
     in property <string> label: "Node";
-    in property <int> active_layout_mode:0;
+    // Change this property from active_layout_mode to creation_mode
+    in property <int> creation_mode: 0;
+
     width: 120px;
     height: 40px;
-
     background: #e1f5fe.with-alpha(0.5);
-
     border-width: 1px;
     border-color: #0288d1;
     border-radius: 4px;
 
-    // INPUT PORT
-   if (root.active_layout_mode == 0 || root.active_layout_mode == 2): Rectangle {
+    // INPUT PORT (Horizontal: Left Side)
+    if (root.creation_mode == 0 || root.creation_mode == 2): Rectangle {
         x: -5px;
         y: 15px;
-
         width: 10px;
         height: 10px;
-
         border-radius: 5px;
-
         background: input_touch.has-hover ? orange : #0288d1;
 
         input_touch := TouchArea {
-
             clicked => {
                 root.port_clicked(true);
             }
         }
     }
 
-    // OUTPUT PORT
- if (root.active_layout_mode == 0 || root.active_layout_mode == 2): Rectangle {
-
+    // OUTPUT PORT (Horizontal: Right Side)
+    if (root.creation_mode == 0 || root.creation_mode == 2): Rectangle {
         x: 115px;
         y: 15px;
-
         width: 10px;
         height: 10px;
-
         border-radius: 5px;
-
         background: output_touch.has-hover ? orange : #0288d1;
 
         output_touch := TouchArea {
-
             clicked => {
                 root.port_clicked(false);
             }
         }
     }
-    if (root.active_layout_mode == 1 || root.active_layout_mode == 2): Rectangle {
 
-        x: (parent.width / 2) - 4px;
-        y: -4px;
-
+    // INPUT PORT (Vertical: Top Side)
+    if (root.creation_mode == 1 || root.creation_mode == 2): Rectangle {
+        x: (parent.width / 2) - 5px;
+        y: -5px;
         width: 10px;
         height: 10px;
-
         border-radius: 5px;
-
         background: top_touch.has-hover ? orange : #0288d1;
 
         top_touch := TouchArea {
-
             clicked => {
-                root.port_clicked(false);
-            }
+                root.port_clicked(true);
+            } // Input = true
         }
     }
-    if (root.active_layout_mode == 1 || root.active_layout_mode == 2): Rectangle {
 
-        x: (parent.width / 2) - 4px;
-        y: parent.height - 4px;
-
+    // OUTPUT PORT (Vertical: Bottom Side)
+    if (root.creation_mode == 1 || root.creation_mode == 2): Rectangle {
+        x: (parent.width / 2) - 5px;
+        y: parent.height - 5px;
         width: 10px;
         height: 10px;
-
         border-radius: 5px;
-
         background: bottom_touch.has-hover ? orange : #0288d1;
 
         bottom_touch := TouchArea {
-
             clicked => {
                 root.port_clicked(false);
-            }
+            } // Output = false
         }
     }
+
     Text {
-
         text: root.label;
-
         color: rgb(40, 40, 50);
-
         width: 100%;
-
         horizontal-alignment: center;
         vertical-alignment: center;
     }
@@ -286,6 +161,7 @@ export component AppWindow inherits Window {
     in-out property <bool> is_dragging: false;
 
     in-out property <string> drag_name: "";
+    in-out property <int> creation_mode: 0;
     in-out property <string> drag_type: "";
     in-out property <string> bg_color: "";
     in-out property <float> drag_x: 0;
@@ -306,7 +182,7 @@ export component AppWindow inherits Window {
 
     callback select_library_symbol(string);
 
-    callback place_symbol(string, string, string, float, float);
+    callback place_symbol(string, string, string, float, float, int);
 
     callback update_symbol_position(int, float, float);
 
@@ -316,7 +192,7 @@ export component AppWindow inherits Window {
 
     callback import_xml();
 
-    callback handle_port_click(int, bool);
+    callback handle_port_click(int, bool, int);
 
     callback select_connection(int);
 
@@ -435,6 +311,7 @@ Rectangle {
                                 root.drag_x = (self.mouse-x + parent.x) / 1px;
 
                                 root.drag_y = (self.mouse-y + parent.y) / 1px;
+                                root.creation_mode = root.active_layout_mode;
                             }
                         }
                     }
@@ -1031,7 +908,7 @@ Rectangle {
 
         Rectangle {
 
-            background: white;
+            background: #f8f2f2;
 
             // Dynamically calculate vertical lines to fill the width
     for i in Math.ceil(parent.width / 15px): Rectangle {
@@ -1073,7 +950,8 @@ Rectangle {
                         root.drag_type,  // 2. node_type (string)
                         "#0d6efd",       // 3. bg_color (string) -> Pass your target color string hex here!
                         root.drag_x,     // 4. x coordinate (float)
-                        root.drag_y      // 5. y coordinate (float)
+                        root.drag_y,
+                        root.creation_mode     // 5. y coordinate (float)
                     );
 
                         root.is_dragging = false;
@@ -1103,13 +981,9 @@ Rectangle {
                 NodeSymbol {
 
                     label: root.drag_name;
-                    active_layout_mode: root.active_layout_mode;
+                    creation_mode: root.active_layout_mode;
                 }
             }
-
-            // =========================
-            // NODES
-            // =========================
 
             for item[i] in root.all_symbols: Rectangle {
                 z: 2;
@@ -1134,12 +1008,14 @@ Rectangle {
                 NodeSymbol {
 
                     label: item.label == "" ? item.name : item.label;
+                    creation_mode: item.creation_mode;
 
                     port_clicked(is_input) => {
 
                         root.handle_port_click(
                             i,
-                            is_input);
+                            is_input,
+                            item.creation_mode);
                     }
                 }
 
@@ -1175,45 +1051,38 @@ Rectangle {
                 }
             }
 
-            // =========================
-            // CONNECTIONS
-            // =========================
-for conn[index] in root.connections: Rectangle {
+            for conn[index] in root.connections: Rectangle {
 
-                // =====================================
-    // SOURCE / TARGET (Global Space)
-    // =====================================
-    property <float> sx: root.all_symbols[conn.from_index].x + 60;
-                property <float> sy: root.all_symbols[conn.from_index].y + 2;
+                property <float> sx:     conn.creation_mode == 1 ? root.all_symbols[conn.from_index].x + 3 : root.all_symbols[conn.from_index].x + 60;
 
-                property <float> tx: root.all_symbols[conn.to_index].x - 60;
-                property <float> ty: root.all_symbols[conn.to_index].y + 2;
+                property <float> sy:     conn.creation_mode == 1 ? root.all_symbols[conn.from_index].y + 20 : root.all_symbols[conn.from_index].y + 2;
 
-                // =====================================
-    // LOCAL RECT BOUNDING BOX
-    // =====================================
-    property <float> left: Math.min(sx, tx);
-                property <float> top: Math.min(sy, ty);
+                property <float> tx:     conn.creation_mode == 1 ? root.all_symbols[conn.to_index].x + 3 : root.all_symbols[conn.to_index].x - 60;
 
-                // 120px padding prevents the sweeping loops from getting clipped at the borders
-    property <float> pad: 120;
+                property <float> ty:    conn.creation_mode == 1 ? root.all_symbols[conn.to_index].y - 20 : root.all_symbols[conn.to_index].y + 2;
 
-                property <float> pw: Math.max(Math.abs(tx - sx), 1) + (pad * 2);
-                property <float> ph: Math.max(Math.abs(ty - sy), 1) + (pad * 2);
+                property <float> left:         Math.min(sx, tx);
+
+                property <float> top:         Math.min(sy, ty);
+
+                property <float> pad: 120;
+                property <float> pw:         Math.max(Math.abs(tx - sx), 1) + (pad * 2);
+
+                property <float> ph:         Math.max(Math.abs(ty - sy), 1) + (pad * 2);
 
                 x: (left - pad) * 1px;
                 y: (top - pad) * 1px;
+
                 width: pw * 1px;
                 height: ph * 1px;
+
                 background: transparent;
 
-                // Keeps wires layered underneath nodes so nodes remain clickable
-    z: 1;
+                z: 1;
 
-                // =====================================
-    // PATH ROUTING
-    // =====================================
-    Path {
+                Path {
+
+                    visible: conn.creation_mode != 1;
                     width: parent.width;
                     height: parent.height;
 
@@ -1223,212 +1092,282 @@ for conn[index] in root.connections: Rectangle {
                     viewbox-height: ph;
 
                     fill: transparent;
-                    stroke: conn.selected ? red : #0288d1;
-                    stroke-width: 1.5px;
+                    stroke: orange;
+                    stroke-width: 2px;
 
-     // =====================================
-        // GAP-BOUNDED REVERSE LOOP LOGIC
-        // =====================================
-// =====================================
-        // PERFECT S-LOOP REVERSE ROUTING
-        // =====================================
-        property <bool> is_forward: tx >= sx;
-        property <bool> is_downward: ty >= sy;
+                    property <bool> is_forward:            tx >= sx;
 
-        // X-axis handle extension: Pushes out far to form the side loops
-        property <float> curve_x: is_forward ? Math.min(Math.abs(tx - sx) / 2, 40) : 180;
-        
-        // Y-axis handle separation: Adds vertical tension when nodes are reversed
-        property <float> curve_y: is_forward ? 0 : 80;
+                    property <float> local_sx:             sx - left + pad;
 
-        property <float> local_sx: sx - left + pad;
-        property <float> local_sy: sy - top + pad;
-        property <float> local_tx: tx - left + pad;
-        property <float> local_ty: ty - top + pad;
+                    property <float> local_sy:             sy - top + pad;
 
-        MoveTo {
-            x: local_sx;
-            y: local_sy;
-        }
+                    property <float> local_tx:             tx - left + pad;
 
-        CubicTo {
-            // Control 1: Shoots rightward, then curves down/up following the layout flow
-            control-1-x: local_sx + curve_x;
-            control-1-y: local_sy + (is_downward ? curve_y : -curve_y);
+                    property <float> local_ty:            ty - top + pad;
 
-            // Control 2: Shoots leftward, then curves in the OPPOSITE vertical direction to Control 1
-            // This inversion is what snaps it from a rigid C-loop into a flawless S-loop!
-            control-2-x: local_tx - curve_x;
-            control-2-y: local_ty + (is_downward ? -curve_y : curve_y);
+                    property <float> center_offset: -2;
 
-            x: local_tx;
-            y: local_ty;
-        }
-    }
+                    property <float> adjusted_sy:             local_sy + center_offset;
 
-                TouchArea {
+                    property <float> adjusted_ty:             local_ty + center_offset;
+
+                    property <float> mid_x:             local_sx + (local_tx - local_sx) / 2;
+
+                    property <float> wp_x1:             is_forward ? mid_x : (local_sx + 40);
+
+                    property <float> wp_x2:             is_forward ? mid_x : (local_tx - 40);
+
+                    property <float> wp_y:             is_forward ? adjusted_ty : (adjusted_sy + (adjusted_ty - adjusted_sy) / 2);
+
+                    MoveTo {
+                        x: local_sx;
+                        y: adjusted_sy;
+                    }
+
+                    LineTo {
+                        x: wp_x1;
+                        y: adjusted_sy;
+                    }
+
+                    LineTo {
+                        x: wp_x1;
+                        y: wp_y;
+                    }
+
+                    LineTo {
+                        x: wp_x2;
+                        y: wp_y;
+                    }
+
+                    LineTo {
+                        x: wp_x2;
+                        y: adjusted_ty;
+                    }
+
+                    LineTo {
+                        x: local_tx;
+                        y: adjusted_ty;
+                    }
+                }
+
+                Path {
+
+                    visible: conn.creation_mode == 1;
+
                     width: parent.width;
                     height: parent.height;
+
+                    viewbox-x: 0;
+                    viewbox-y: 0;
+                    viewbox-width: pw;
+                    viewbox-height: ph;
+
+                    fill: transparent;
+                    stroke: orange;
+                    stroke-width: 2px;
+
+                    property <float> local_sx:            sx - left + pad;
+
+                    property <float> local_sy:            sy - top + pad;
+
+                    property <float> local_tx:            tx - left + pad;
+
+                    property <float> local_ty:            ty - top + pad;
+
+                    property <float> center_offset: -2;
+
+                    property <float> adjusted_sx:            local_sx + center_offset;
+                    property <float> adjusted_tx:            local_tx + center_offset;
+
+                    property <float> mid_y:            local_sy + ((local_ty - local_sy) / 2);
+
+                    MoveTo {
+                        x: adjusted_sx;
+                        y: local_sy;
+                    }
+
+                    LineTo {
+                        x: adjusted_sx;
+                        y: mid_y;
+                    }
+
+                    LineTo {
+                        x: adjusted_tx;
+                        y: mid_y;
+                    }
+
+                    LineTo {
+                        x: adjusted_tx;
+                        y: local_ty;
+                    }
+                }
+
+                TouchArea {
+
+                    width: parent.width;
+                    height: parent.height;
+
                     clicked => {
                         root.select_connection(index);
                     }
                 }
             }
-            if (root.show_node_modal): Rectangle {
-                width: parent.width;
-                height: parent.height;
-                background: #00000088;
+        }
+    }
 
-                // Blocks background clicks from passing through to the node canvas below
+    if (root.show_node_modal): Rectangle {
+        width: parent.width;
+        height: parent.height;
+        background: #00000088;
+
+        // Blocks background clicks from passing through to the node canvas below
     TouchArea { }
 
-                Rectangle {
-                    width: 360px;
-                    height: 260px; // Increased height slightly to accommodate the new input box wrappers
+        Rectangle {
+            width: 360px;
+            height: 260px; // Increased height slightly to accommodate the new input box wrappers
         x: (parent.width - self.width) / 2;
-                    y: (parent.height - self.height) / 2;
-                    background: white;
-                    border-radius: 8px;
+            y: (parent.height - self.height) / 2;
+            background: white;
+            border-radius: 8px;
+            border-width: 1px;
+            border-color: #cccccc;
+
+            VerticalLayout {
+                padding: 16px;
+                spacing: 12px;
+
+                Text {
+                    text: "Edit Node";
+                    font-size: 20px;
+                    font-weight: 700;
+                    color: #222;
+                }
+
+                // --- LABEL INPUT ---
+            Text {
+                    text: "Label";
+                    font-weight: 600;
+                    color: #444;
+                }
+
+                // This wrapper creates the visible text box area
+            Rectangle {
+                    background: #fcfcfc;
                     border-width: 1px;
                     border-color: #cccccc;
-
-                    VerticalLayout {
-                        padding: 16px;
-                        spacing: 12px;
-
-                        Text {
-                            text: "Edit Node";
-                            font-size: 20px;
-                            font-weight: 700;
-                            color: #222;
-                        }
-
-                        // --- LABEL INPUT ---
-            Text {
-                            text: "Label";
-                            font-weight: 600;
-                            color: #444;
-                        }
-
-                        // This wrapper creates the visible text box area
-            Rectangle {
-                            background: #fcfcfc;
-                            border-width: 1px;
-                            border-color: #cccccc;
-                            border-radius: 4px;
-                            height: 32px; // Gives a clear, clickable 32px tall target area
+                    border-radius: 4px;
+                    height: 32px; // Gives a clear, clickable 32px tall target area
                 
                 TextInput {
-                                text <=> root.edit_label;
-                                font-size: 14px;
-                                x: 6px; // Offsets the text slightly from the left border edge
+                        text <=> root.edit_label;
+                        font-size: 14px;
+                        x: 6px; // Offsets the text slightly from the left border edge
                     vertical-alignment: center;
-                            }
-                        }
+                    }
+                }
 
-                        // --- VALUE INPUT ---
+                // --- VALUE INPUT ---
             Text {
-                            text: "Value";
-                            font-weight: 600;
-                            color: #444;
-                        }
+                    text: "Value";
+                    font-weight: 600;
+                    color: #444;
+                }
 
-                        // This wrapper creates the second visible text box area
+                // This wrapper creates the second visible text box area
             Rectangle {
-                            background: #fcfcfc;
-                            border-width: 1px;
-                            border-color: #cccccc;
-                            border-radius: 4px;
-                            height: 32px;
+                    background: #fcfcfc;
+                    border-width: 1px;
+                    border-color: #cccccc;
+                    border-radius: 4px;
+                    height: 32px;
 
-                            TextInput {
-                                text <=> root.edit_value;
-                                font-size: 14px;
-                                x: 6px;
-                                vertical-alignment: center;
-                            }
-                        }
+                    TextInput {
+                        text <=> root.edit_value;
+                        font-size: 14px;
+                        x: 6px;
+                        vertical-alignment: center;
+                    }
+                }
 
-                        // Flexible empty space to push the buttons neatly to the bottom edge
+                // Flexible empty space to push the buttons neatly to the bottom edge
             Rectangle { }
 
-                        // --- DIALOG BUTTONS ---
+                // --- DIALOG BUTTONS ---
             HorizontalLayout {
-                            spacing: 10px;
-                            height: 36px;
+                    spacing: 10px;
+                    height: 36px;
 
-                            Button {
-                                text: "Save";
-                                clicked => {
-                                    root.save_node_properties(
+                    Button {
+                        text: "Save";
+                        clicked => {
+                            root.save_node_properties(
                             root.editing_index,
                             root.edit_label,
                             root.edit_value);
-                                    root.show_node_modal = false;
-                                }
-                            }
+                            root.show_node_modal = false;
+                        }
+                    }
 
-                            Button {
-                                text: "Close";
-                                clicked => {
-                                    root.show_node_modal = false;
-                                }
-                            }
+                    Button {
+                        text: "Close";
+                        clicked => {
+                            root.show_node_modal = false;
                         }
                     }
                 }
             }
+        }
+    }
 
-            if (root.show_alert): Rectangle {
-                width: parent.width;
-                height: parent.height;
-                background: #00000044; // Tinted overlay dimming the canvas background
+    if (root.show_alert): Rectangle {
+        width: parent.width;
+        height: parent.height;
+        background: #00000044; // Tinted overlay dimming the canvas background
         
         // Block mouse interactions from leaking down to the node editor canvas
         TouchArea { }
 
-                Rectangle {
-                    width: 320px;
-                    height: 160px;
-                    background: white;
-                    border-radius: 8px;
-                    border-width: 1px;
-                    border-color: #dddddd;
+        Rectangle {
+            width: 320px;
+            height: 160px;
+            background: white;
+            border-radius: 8px;
+            border-width: 1px;
+            border-color: #dddddd;
 
-                    // Subtle drop shadow effect using nested borders
+            // Subtle drop shadow effect using nested borders
             clip: true;
 
-                    VerticalLayout {
-                        padding: 20px;
-                        spacing: 15px;
+            VerticalLayout {
+                padding: 20px;
+                spacing: 15px;
 
-                        Text {
-                            text: "Notification";
-                            font-size: 16px;
-                            font-weight: 700;
-                            color: #333333;
-                        }
+                Text {
+                    text: "Notification";
+                    font-size: 16px;
+                    font-weight: 700;
+                    color: #333333;
+                }
 
-                        Text {
-                            text: root.alert_message;
-                            font-size: 13px;
-                            color: #555555;
-                            wrap: word-wrap;
-                        }
+                Text {
+                    text: root.alert_message;
+                    font-size: 13px;
+                    color: #555555;
+                    wrap: word-wrap;
+                }
 
-                        // Push down the close button
+                // Push down the close button
                 Rectangle { }
 
-                        HorizontalLayout {
-                            alignment: end;
-                            Button {
-                                text: "OK";
-                                width: 70px;
-                                height: 30px;
-                                clicked => {
-                                    root.show_alert = false;
-                                }
-                            }
+                HorizontalLayout {
+                    alignment: end;
+                    Button {
+                        text: "OK";
+                        width: 70px;
+                        height: 30px;
+                        clicked => {
+                            root.show_alert = false;
                         }
                     }
                 }

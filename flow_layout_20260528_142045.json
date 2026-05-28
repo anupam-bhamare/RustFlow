@@ -1,0 +1,136 @@
+{
+  "nodes": [
+    {
+      "id": "1",
+      "label": "Text",
+      "node_type": "ui_text",
+      "x_pos": 122.66666,
+      "y_pos": 72.66667,
+      "value": "",
+      "bg_color": "#0d6efd"
+    },
+    {
+      "id": "2",
+      "label": "Button",
+      "node_type": "ui_button",
+      "x_pos": 484.6667,
+      "y_pos": 72.66667,
+      "value": "",
+      "bg_color": "#0d6efd"
+    },
+    {
+      "id": "3",
+      "label": "Dropdown",
+      "node_type": "ui_dropdown",
+      "x_pos": 834.6666,
+      "y_pos": 72.66667,
+      "value": "",
+      "bg_color": "#0d6efd"
+    },
+    {
+      "id": "4",
+      "label": "Switch",
+      "node_type": "ui_dropdown",
+      "x_pos": 194.0,
+      "y_pos": 181.33334,
+      "value": "",
+      "bg_color": "#0d6efd"
+    },
+    {
+      "id": "5",
+      "label": "Change",
+      "node_type": "ui_dropdown",
+      "x_pos": 530.0,
+      "y_pos": 181.33333,
+      "value": "",
+      "bg_color": "#0d6efd"
+    },
+    {
+      "id": "6",
+      "label": "Range",
+      "node_type": "ui_dropdown",
+      "x_pos": 440.66666,
+      "y_pos": 284.0,
+      "value": "",
+      "bg_color": "#0d6efd"
+    },
+    {
+      "id": "7",
+      "label": "Trigger",
+      "node_type": "ui_dropdown",
+      "x_pos": 882.6666,
+      "y_pos": 283.33334,
+      "value": "",
+      "bg_color": "#0d6efd"
+    },
+    {
+      "id": "8",
+      "label": "TCP",
+      "node_type": "ui_dropdown",
+      "x_pos": 222.0,
+      "y_pos": 420.66666,
+      "value": "",
+      "bg_color": "#0d6efd"
+    },
+    {
+      "id": "9",
+      "label": "Button",
+      "node_type": "ui_dropdown",
+      "x_pos": 483.3333,
+      "y_pos": 475.33334,
+      "value": "",
+      "bg_color": "#0d6efd"
+    },
+    {
+      "id": "10",
+      "label": "Button",
+      "node_type": "ui_dropdown",
+      "x_pos": 643.3333,
+      "y_pos": 558.6667,
+      "value": "",
+      "bg_color": "#0d6efd"
+    }
+  ],
+  "wires": [
+    {
+      "from": "node_1",
+      "to": "node_2"
+    },
+    {
+      "from": "node_2",
+      "to": "node_3"
+    },
+    {
+      "from": "node_3",
+      "to": "node_4"
+    },
+    {
+      "from": "node_4",
+      "to": "node_5"
+    },
+    {
+      "from": "node_5",
+      "to": "node_6"
+    },
+    {
+      "from": "node_6",
+      "to": "node_7"
+    },
+    {
+      "from": "node_7",
+      "to": "node_8"
+    },
+    {
+      "from": "node_8",
+      "to": "node_9"
+    },
+    {
+      "from": "node_9",
+      "to": "node_10"
+    },
+    {
+      "from": "node_10",
+      "to": "node_1"
+    }
+  ]
+}
