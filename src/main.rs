@@ -1,4 +1,4 @@
-use slint::{ComponentHandle, Model, VecModel};
+use slint::{ComponentHandle, Model, ToSharedString, VecModel};
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::io::Read; 
@@ -19,13 +19,16 @@ pub struct JsonNode {
     pub value: String,
     pub bg_color: String,
     pub creation_mode: i32,
+ 
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 pub struct JsonWire {
     pub from: String,
     pub to: String,
-    layout_mode: i32
+    layout_mode: i32,
+    pub from_port: String,
+    pub to_port: String,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
@@ -176,32 +179,43 @@ ui.on_place_symbol(move |name, node_type, bg_color, x, y,mode| {
     // =========================================
     // WIRING LOGIC
     // =========================================
-    let wire_source = Rc::new(Cell::new(-1));
-    ui.on_handle_port_click({
-        let conn_model = connections.clone();
-        let wire_source = wire_source.clone();
+   let wire_source = Rc::new(Cell::new(-1));
+let active_source_port = Rc::new(RefCell::new(String::new()));
 
-        move |node_index, is_input,mode| {
-            if !is_input {
-                wire_source.set(node_index);
-                println!("Selected source node: {}", node_index);
-            } else {
-                let source = wire_source.get();
-                if source != -1 && source != node_index {
-                    println!("Selected target node: {}", node_index);
-                    conn_model.push(Connection {
-                        from_index: source,
-                        to_index: node_index,
-                        selected: false,
-                        creation_mode:mode
-                    });
-                    println!("Connected {} -> {}", source, node_index);
-                }
-                wire_source.set(-1);
+ui.on_handle_port_click({
+    let conn_model = connections.clone();
+    let wire_source = wire_source.clone();
+    let src_port = active_source_port.clone();
+
+    move |node_index, is_input, mode, port_name| {
+        let port_str = port_name.to_string();
+        if !is_input {
+            wire_source.set(node_index);
+            *src_port.borrow_mut() = port_str;
+        } else {
+            let source = wire_source.get();
+            if source != -1 && source != node_index {
+                println!("Selected target node: {}", node_index);
+                
+                // FIX: Dereference the borrow guard and take the underlying String value cleanly
+                let saved_port = std::mem::take(&mut *src_port.borrow_mut());
+                let from_port_shared = slint::SharedString::from(saved_port);
+                let to_port_shared = slint::SharedString::from(port_str);
+
+                conn_model.push(Connection {
+                    from_index: source,
+                    to_index: node_index,
+                    selected: false,
+                    creation_mode: mode,
+                    from_port: from_port_shared,
+                    to_port: to_port_shared,
+                });
+                println!("Connected {} -> {}", source, node_index);
             }
+            wire_source.set(-1);
         }
-    });
-
+    }
+});
     // =========================================
     // SELECT CONNECTION
     // =========================================
@@ -281,6 +295,7 @@ ui.on_place_symbol(move |name, node_type, bg_color, x, y,mode| {
                         value: item.value.to_string(),
                         bg_color: if item.bg_color.is_empty() { "#0d6efd".to_string() } else { item.bg_color.to_string() },
                         creation_mode: item.creation_mode,
+
                     });
                 }
             }
@@ -293,6 +308,8 @@ ui.on_place_symbol(move |name, node_type, bg_color, x, y,mode| {
                         from: format!("node_{}", conn.from_index + 1),
                         to: format!("node_{}", conn.to_index + 1),
                         layout_mode: conn.creation_mode,
+                        from_port:conn.from_port.to_string(),
+                        to_port:conn.to_port.to_string()
                     });
                 }
             }
@@ -409,7 +426,10 @@ ui.on_place_symbol(move |name, node_type, bg_color, x, y,mode| {
                         from_index: from_val - 1,
                         to_index: to_val - 1,
                         selected: false, 
-                        creation_mode:wire.layout_mode// <-- FIXED: Added the missing field initialization
+                        creation_mode:wire.layout_mode,// <-- FIXED: Added the missing field initialization
+                // Convert native Rust String types directly into Slint's SharedString structure
+            from_port: slint::SharedString::from(&wire.from_port),
+            to_port: slint::SharedString::from(&wire.to_port),
                     });
                 }
             }

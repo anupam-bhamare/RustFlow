@@ -17,6 +17,8 @@ export struct Connection {
     to_index: int,
     selected: bool,
     creation_mode: int,
+    from_port: string, // <-- "right", "bottom", "left", "top"
+    to_port: string,   // <-- "left", "top", "right", "bottom"
 }
 struct LibraryItem {
     name: string,      // What the user sees in the sidebar (e.g., "Dropdown")
@@ -33,7 +35,7 @@ struct LibraryItem {
 
 component NodeSymbol inherits Rectangle {
 
-    callback port_clicked(bool);
+    callback port_clicked(bool, string);
 
     in property <string> label: "Node";
     // Change this property from active_layout_mode to creation_mode
@@ -57,7 +59,7 @@ component NodeSymbol inherits Rectangle {
 
         input_touch := TouchArea {
             clicked => {
-                root.port_clicked(true);
+                root.port_clicked(true, "left");
             }
         }
     }
@@ -73,7 +75,7 @@ component NodeSymbol inherits Rectangle {
 
         output_touch := TouchArea {
             clicked => {
-                root.port_clicked(false);
+                root.port_clicked(false,"right");
             }
         }
     }
@@ -89,7 +91,7 @@ component NodeSymbol inherits Rectangle {
 
         top_touch := TouchArea {
             clicked => {
-                root.port_clicked(true);
+                root.port_clicked(true, "top");
             } // Input = true
         }
     }
@@ -105,7 +107,7 @@ component NodeSymbol inherits Rectangle {
 
         bottom_touch := TouchArea {
             clicked => {
-                root.port_clicked(false);
+                root.port_clicked(false,"bottom");
             } // Output = false
         }
     }
@@ -192,7 +194,7 @@ export component AppWindow inherits Window {
 
     callback import_xml();
 
-    callback handle_port_click(int, bool, int);
+    callback handle_port_click(int, bool, int, string);
 
     callback select_connection(int);
 
@@ -480,6 +482,7 @@ Rectangle {
                                 root.drag_x = (self.mouse-x + parent.x) / 1px;
 
                                 root.drag_y = (self.mouse-y + parent.y) / 1px;
+                                root.creation_mode = root.active_layout_mode;
                             }
                         }
                     }
@@ -563,6 +566,7 @@ Rectangle {
                                 root.drag_x = (self.mouse-x + parent.x) / 1px;
 
                                 root.drag_y = (self.mouse-y + parent.y) / 1px;
+                                root.creation_mode = root.active_layout_mode;
                             }
                         }
                     }
@@ -650,6 +654,7 @@ Rectangle {
                                 root.drag_x = (self.mouse-x + parent.x) / 1px;
 
                                 root.drag_y = (self.mouse-y + parent.y) / 1px;
+                                root.creation_mode = root.active_layout_mode;
                             }
                         }
                     }
@@ -739,6 +744,7 @@ Rectangle {
                                 root.drag_x = (self.mouse-x + parent.x) / 1px;
 
                                 root.drag_y = (self.mouse-y + parent.y) / 1px;
+                                root.creation_mode = root.active_layout_mode;
                             }
                         }
                     }
@@ -1010,12 +1016,13 @@ Rectangle {
                     label: item.label == "" ? item.name : item.label;
                     creation_mode: item.creation_mode;
 
-                    port_clicked(is_input) => {
+                    port_clicked(is_input, port_name) => {
 
                         root.handle_port_click(
                             i,
                             is_input,
-                            item.creation_mode);
+                            item.creation_mode,
+                            port-name);
                     }
                 }
 
@@ -1052,37 +1059,34 @@ Rectangle {
             }
 
             for conn[index] in root.connections: Rectangle {
+                property <float> sx: (conn.from_port == "right") ? (root.all_symbols[conn.from_index].x + 60) : (conn.from_port == "left") ? (root.all_symbols[conn.from_index].x - 60) : (root.all_symbols[conn.from_index].x + 3);
 
-                property <float> sx:     conn.creation_mode == 1 ? root.all_symbols[conn.from_index].x + 3 : root.all_symbols[conn.from_index].x + 60;
+                property <float> sy: (conn.from_port == "right" || conn.from_port == "left") ? (root.all_symbols[conn.from_index].y) : (conn.from_port == "bottom") ? (root.all_symbols[conn.from_index].y + 20) : (root.all_symbols[conn.from_index].y - 20);
 
-                property <float> sy:     conn.creation_mode == 1 ? root.all_symbols[conn.from_index].y + 20 : root.all_symbols[conn.from_index].y + 2;
+                property <float> tx: (conn.to_port == "right") ? (root.all_symbols[conn.to_index].x + 60) : (conn.to_port == "left") ? (root.all_symbols[conn.to_index].x - 60) : (root.all_symbols[conn.to_index].x + 3);
 
-                property <float> tx:     conn.creation_mode == 1 ? root.all_symbols[conn.to_index].x + 3 : root.all_symbols[conn.to_index].x - 60;
+                property <float> ty: (conn.to_port == "right" || conn.to_port == "left") ? (root.all_symbols[conn.to_index].y) : (conn.to_port == "bottom") ? (root.all_symbols[conn.to_index].y + 20) : (root.all_symbols[conn.to_index].y - 20);
+                init => {
+                    debug("Connection Index:", index);
+                    debug("  From Port ->", conn.from_port);
+                    debug("  To Port   ->", conn.to_port);
+                }
+                property <float> left: Math.min(sx, tx);
+                property <float> top:  Math.min(sy, ty);
+                property <float> pad:  120;
 
-                property <float> ty:    conn.creation_mode == 1 ? root.all_symbols[conn.to_index].y - 20 : root.all_symbols[conn.to_index].y + 2;
-
-                property <float> left:         Math.min(sx, tx);
-
-                property <float> top:         Math.min(sy, ty);
-
-                property <float> pad: 120;
-                property <float> pw:         Math.max(Math.abs(tx - sx), 1) + (pad * 2);
-
-                property <float> ph:         Math.max(Math.abs(ty - sy), 1) + (pad * 2);
+                property <float> pw:   Math.max(Math.abs(tx - sx), 1) + (pad * 2);
+                property <float> ph:   Math.max(Math.abs(ty - sy), 1) + (pad * 2);
 
                 x: (left - pad) * 1px;
                 y: (top - pad) * 1px;
-
                 width: pw * 1px;
                 height: ph * 1px;
-
                 background: transparent;
-
                 z: 1;
 
-                Path {
-
-                    visible: conn.creation_mode != 1;
+              Path {
+                    visible: (conn.from_port == "right" && conn.to_port == "top");
                     width: parent.width;
                     height: parent.height;
 
@@ -1095,65 +1099,120 @@ Rectangle {
                     stroke: orange;
                     stroke-width: 2px;
 
-                    property <bool> is_forward:            tx >= sx;
-
-                    property <float> local_sx:             sx - left + pad;
-
-                    property <float> local_sy:             sy - top + pad;
-
-                    property <float> local_tx:             tx - left + pad;
-
-                    property <float> local_ty:            ty - top + pad;
+                    property <float> local_sx:    sx - left + pad;
+                    property <float> local_sy:    sy - top + pad;
+                    property <float> local_tx:    tx - left + pad;
+                    property <float> local_ty:    ty - top + pad;
 
                     property <float> center_offset: -2;
+                    property <float> adjusted_sy:   local_sy + center_offset;
+                    property <float> adjusted_ty:   local_ty + center_offset;
+                    property <float> adjusted_tx:   local_tx + center_offset;
 
-                    property <float> adjusted_sy:             local_sy + center_offset;
+                    // DIRECTION CHECKS
+                    property <bool> is_target_above: ty < sy;
+                    property <bool> is_target_left:  tx < sx;
 
-                    property <float> adjusted_ty:             local_ty + center_offset;
+                    // DYNAMIC WAYPOINTS
+                    // Step 1: Push out from the right port to clear the source block
+                    property <float> wp_x1: local_sx + 40;
 
-                    property <float> mid_x:             local_sx + (local_tx - local_sx) / 2;
+                    // Step 2: Determine vertical approach path
+                    // If target is above, drop above its top port by 30px; otherwise, settle in the midpoint corridor
+                    property <float> wp_y1: is_target_above ? (local_ty - 30) : (adjusted_sy + ((local_ty - adjusted_sy) / 2));
 
-                    property <float> wp_x1:             is_forward ? mid_x : (local_sx + 40);
-
-                    property <float> wp_x2:             is_forward ? mid_x : (local_tx - 40);
-
-                    property <float> wp_y:             is_forward ? adjusted_ty : (adjusted_sy + (adjusted_ty - adjusted_sy) / 2);
+                    // Step 3: Align over the target node column
+                    // If target is physically left of the source's exit corridor, loop out wide to the right side of the layout bounding box
+                    property <float> wp_x2: (is_target_above && is_target_left) ? 
+                        (Math.max(local_sx, local_tx) + 80) : 
+                        adjusted_tx;
 
                     MoveTo {
                         x: local_sx;
-                        y: adjusted_sy;
+                        y: adjusted_sy + 1;
                     }
 
+                    // 1. Extend right out of port
                     LineTo {
                         x: wp_x1;
-                        y: adjusted_sy;
+                        y: adjusted_sy + 1;
                     }
 
+                    // 2. Adjust vertically to travel height
                     LineTo {
                         x: wp_x1;
-                        y: wp_y;
+                        y: wp_y1;
+                    }
+
+                    // 3. Move horizontally to line up above the target's top port entry column
+                    LineTo {
+                        x: wp_x2;
+                        y: wp_y1;
+                    }
+
+                    // 4. Drop vertically straight down into the top port
+                    LineTo {
+                        x: wp_x2;
+                        y: local_ty;
+                    }
+                }
+
+                Path {
+                    visible: (conn.from_port == "bottom" && conn.to_port == "left");
+                    width: parent.width;
+                    height: parent.height;
+
+                    viewbox-x: 0;
+                    viewbox-y: 0;
+                    viewbox-width: pw;
+                    viewbox-height: ph;
+
+                    fill: transparent;
+                    stroke: orange;
+                    stroke-width: 2px;
+
+                    property <bool> is_forward:   tx >= sx;
+                    property <float> local_sx:    (sx - left + pad) - 1;
+                    property <float> local_sy:    sy - top + pad;
+                    property <float> local_tx:    tx - left + pad;
+                    property <float> local_ty:   ty - top + pad;
+
+                    property <float> center_offset: -2;
+                    property <float> adjusted_sy:   local_sy + center_offset;
+                    property <float> adjusted_ty:   local_ty + center_offset;
+
+                    property <float> wp_y1: local_sy + 40;
+                    property <float> wp_x:  local_tx - 40;
+
+                    MoveTo {
+                        x: local_sx + 1;
+                        y: local_sy;
                     }
 
                     LineTo {
-                        x: wp_x2;
-                        y: wp_y;
+                        x: local_sx + 1;
+                        y: wp_y1;
                     }
 
                     LineTo {
-                        x: wp_x2;
-                        y: adjusted_ty;
+                        x: wp_x;
+                        y: wp_y1;
+                    }
+
+                    LineTo {
+                        x: wp_x;
+                        y: adjusted_ty + 1;
                     }
 
                     LineTo {
                         x: local_tx;
-                        y: adjusted_ty;
+                        y: adjusted_ty + 1;
                     }
                 }
 
                 Path {
 
-                    visible: conn.creation_mode == 1;
-
+                    visible: (conn.from_port == "right" && conn.to_port == "left");
                     width: parent.width;
                     height: parent.height;
 
@@ -1166,47 +1225,119 @@ Rectangle {
                     stroke: orange;
                     stroke-width: 2px;
 
-                    property <float> local_sx:            sx - left + pad;
-
-                    property <float> local_sy:            sy - top + pad;
-
-                    property <float> local_tx:            tx - left + pad;
-
-                    property <float> local_ty:            ty - top + pad;
+                    property <bool> is_forward:   tx >= sx;
+                    property <float> local_sx:    sx - left + pad;
+                    property <float> local_sy:    sy - top + pad;
+                    property <float> local_tx:    tx - left + pad;
+                    property <float> local_ty:   ty - top + pad;
 
                     property <float> center_offset: -2;
+                    property <float> adjusted_sy:   local_sy + center_offset;
+                    property <float> adjusted_ty:   local_ty + center_offset;
 
-                    property <float> adjusted_sx:            local_sx + center_offset;
-                    property <float> adjusted_tx:            local_tx + center_offset;
+                    property <bool> is_mixed_route: (conn.from_port == "right" || conn.from_port == "left") && (conn.to_port == "top" || conn.to_port == "bottom");
 
-                    property <float> mid_y:            local_sy + ((local_ty - local_sy) / 2);
+                    property <float> wp_x1: is_mixed_route ? (local_sx + 40) : (is_forward ? (local_sx + (local_tx - local_sx) / 2) : (local_sx + 40));
+                    property <float> wp_y:  is_mixed_route ? (adjusted_sy + (adjusted_ty - adjusted_sy) / 2) : (is_forward ? adjusted_ty : (adjusted_sy + (adjusted_ty - adjusted_sy) / 2));
+                    property <float> wp_x2: is_mixed_route ? local_tx : (is_forward ? (local_sx + (local_tx - local_sx) / 2) : (local_tx - 40));
 
                     MoveTo {
-                        x: adjusted_sx;
+                        x: local_sx;
+                        y: adjusted_sy + 2;
+                    }
+
+                    LineTo {
+                        x: wp_x1;
+                        y: adjusted_sy + 2;
+                    }
+
+                    LineTo {
+                        x: wp_x1;
+                        y: wp_y;
+                    }
+
+                    LineTo {
+                        x: wp_x2;
+                        y: wp_y;
+                    }
+
+                    LineTo {
+                        x: wp_x2;
+                        y: adjusted_ty + 2;
+                    }
+
+                    LineTo {
+                        x: local_tx;
+                        y: adjusted_ty + 2;
+                    }
+                }
+
+                Path {
+                    visible: (conn.from_port == "bottom" && conn.to_port == "top");
+                    width: parent.width;
+                    height: parent.height;
+
+                    viewbox-x: 0;
+                    viewbox-y: 0;
+                    viewbox-width: pw;
+                    viewbox-height: ph;
+
+                    fill: transparent;
+                    stroke: orange;
+                    stroke-width: 2px;
+
+                    property <float> local_sx:    sx - left + pad;
+                    property <float> local_sy:    sy - top + pad;
+                    property <float> local_tx:    tx - left + pad;
+                    property <float> local_ty:    ty - top + pad;
+
+                    property <float> center_offset: -2;
+                    property <float> adjusted_sx:   local_sx + center_offset;
+                    property <float> adjusted_tx:   local_tx + center_offset;
+
+                    property <float> mid_y:       local_sy + ((local_ty - local_sy) / 2);
+                    property <bool> is_target_above: ty < sy;
+
+                    // IMPROVED MARGIN CLEARANCE LOGIC
+                    property <bool> is_target_left: tx < sx;
+
+                    // Finds the outermost edge of the shapes and applies a safe 80px corridor padding
+                    property <float> escape_x: is_target_left ? (Math.min(local_sx, local_tx) - 80) : (Math.max(local_sx, local_tx) + 80);
+
+                    MoveTo {
+                        x: adjusted_sx - 1;
                         y: local_sy;
                     }
 
                     LineTo {
-                        x: adjusted_sx;
-                        y: mid_y;
+                        x: adjusted_sx - 1;
+                        y: is_target_above ? (local_sy + 20) : mid_y;
                     }
 
                     LineTo {
-                        x: adjusted_tx;
-                        y: mid_y;
+                        x: is_target_above ? escape_x : (adjusted_tx - 1);
+                        y: is_target_above ? (local_sy + 20) : mid_y;
                     }
 
                     LineTo {
-                        x: adjusted_tx;
+                        x: is_target_above ? escape_x : (adjusted_tx - 1);
+                        y: is_target_above ? (local_ty - 20) : local_ty;
+                    }
+
+                    LineTo {
+                        x: adjusted_tx - 1;
+                        y: is_target_above ? (local_ty - 20) : local_ty;
+                    }
+
+                    LineTo {
+                        x: adjusted_tx - 1;
                         y: local_ty;
                     }
                 }
 
                 TouchArea {
-
                     width: parent.width;
                     height: parent.height;
-
                     clicked => {
                         root.select_connection(index);
                     }
