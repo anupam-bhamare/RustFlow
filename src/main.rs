@@ -40,16 +40,15 @@ pub struct FlowExport {
 fn main() -> Result<(), slint::PlatformError> {
     let ui = AppWindow::new()?;
 
-    // 1. Create a weak handle to pass into the event loop safely
-    let ui_weak = ui.as_weak();
+// Create a weak reference to safely pass into the event loop closure
+    let weak_app = ui.as_weak();
+    
+    // Schedule the window to maximize once the event loop starts spin-up
     slint::invoke_from_event_loop(move || {
-        if let Some(ui) = ui_weak.upgrade() {
-            let window = ui.window();
-            window.set_fullscreen(false); 
-            window.set_maximized(true);
+        if let Some(ui) = weak_app.upgrade() {
+            ui.window().set_maximized(true);
         }
     }).unwrap();
-
     // =========================================
     // SYMBOL MODEL
     // =========================================
