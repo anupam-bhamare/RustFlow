@@ -6,7 +6,6 @@ export struct SymbolEntry {
     value: string,
     x: float,
     y: float,
-    // Add these two missing fields:
     node_type: string,
     bg_color: string,
     creation_mode: int,
@@ -17,28 +16,20 @@ export struct Connection {
     to_index: int,
     selected: bool,
     creation_mode: int,
-    from_port: string, // <-- "right", "bottom", "left", "top"
-    to_port: string,   // <-- "left", "top", "right", "bottom"
+    from_port: string,
+    to_port: string,
 }
+
 struct LibraryItem {
-    name: string,      // What the user sees in the sidebar (e.g., "Dropdown")
-    node_type: string, // The fixed JSON backend type (e.g., "ui_dropdown")
+    name: string,
+    node_type: string,
 }
-
-
-
-// ======================================================
-// CATEGORY
-// ======================================================
-
-
 
 component NodeSymbol inherits Rectangle {
 
     callback port_clicked(bool, string);
 
     in property <string> label: "Node";
-    // Change this property from active_layout_mode to creation_mode
     in property <int> creation_mode: 0;
 
     width: 120px;
@@ -48,7 +39,6 @@ component NodeSymbol inherits Rectangle {
     border-color: #0288d1;
     border-radius: 4px;
 
-    // INPUT PORT (Horizontal: Left Side)
     if (root.creation_mode == 0 || root.creation_mode == 2): Rectangle {
         x: -5px;
         y: 15px;
@@ -56,7 +46,6 @@ component NodeSymbol inherits Rectangle {
         height: 10px;
         border-radius: 5px;
         background: input_touch.has-hover ? orange : #0288d1;
-
         input_touch := TouchArea {
             clicked => {
                 root.port_clicked(true, "left");
@@ -64,7 +53,6 @@ component NodeSymbol inherits Rectangle {
         }
     }
 
-    // OUTPUT PORT (Horizontal: Right Side)
     if (root.creation_mode == 0 || root.creation_mode == 2): Rectangle {
         x: 115px;
         y: 15px;
@@ -72,7 +60,6 @@ component NodeSymbol inherits Rectangle {
         height: 10px;
         border-radius: 5px;
         background: output_touch.has-hover ? orange : #0288d1;
-
         output_touch := TouchArea {
             clicked => {
                 root.port_clicked(false,"right");
@@ -80,7 +67,6 @@ component NodeSymbol inherits Rectangle {
         }
     }
 
-    // INPUT PORT (Vertical: Top Side)
     if (root.creation_mode == 1 || root.creation_mode == 2): Rectangle {
         x: (parent.width / 2) - 5px;
         y: -5px;
@@ -88,15 +74,13 @@ component NodeSymbol inherits Rectangle {
         height: 10px;
         border-radius: 5px;
         background: top_touch.has-hover ? orange : #0288d1;
-
         top_touch := TouchArea {
             clicked => {
                 root.port_clicked(true, "top");
-            } // Input = true
+            }
         }
     }
 
-    // OUTPUT PORT (Vertical: Bottom Side)
     if (root.creation_mode == 1 || root.creation_mode == 2): Rectangle {
         x: (parent.width / 2) - 5px;
         y: parent.height - 5px;
@@ -104,11 +88,84 @@ component NodeSymbol inherits Rectangle {
         height: 10px;
         border-radius: 5px;
         background: bottom_touch.has-hover ? orange : #0288d1;
-
         bottom_touch := TouchArea {
             clicked => {
                 root.port_clicked(false,"bottom");
-            } // Output = false
+            }
+        }
+    }
+
+    Text {
+        text: root.label;
+        color: rgb(40, 40, 50);
+        width: 100%;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+component InputConnectorSymbol inherits Rectangle {
+
+    callback port_clicked(bool, string);
+
+    in property <string> label: "Node";
+    in property <int> creation_mode: 0;
+
+    width: 60px;
+    height: 40px;
+    background: #bae2b1.with-alpha(0.5);
+    border-width: 1px;
+    border-color: #8ba47c;
+    border-radius: 4px;
+
+    Rectangle {
+        x: -5px;
+        y: 15px;
+        width: 10px;
+        height: 10px;
+        border-radius: 5px;
+        background: input_touch.has-hover ? orange : #8ba47c;
+        input_touch := TouchArea {
+            clicked => {
+                root.port_clicked(true, "left");
+            }
+        }
+    }
+
+    Text {
+        text: root.label;
+        color: rgb(40, 40, 50);
+        width: 100%;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+component OutputConnectorSymbol inherits Rectangle {
+
+    callback port_clicked(bool, string);
+
+    in property <string> label: "Node";
+    in property <int> creation_mode: 0;
+
+    width: 60px;
+    height: 40px;
+    background: #bae2b1.with-alpha(0.5);
+    border-width: 1px;
+    border-color: #8ba47c;
+    border-radius: 4px;
+
+    Rectangle {
+        x: 55px;
+        y: 15px;
+        width: 10px;
+        height: 10px;
+        border-radius: 5px;
+        background: output_touch.has-hover ? orange : #8ba47c;
+        output_touch := TouchArea {
+            clicked => {
+                root.port_clicked(false,"right");
+            }
         }
     }
 
@@ -123,19 +180,17 @@ component NodeSymbol inherits Rectangle {
 
 export component AppWindow inherits Window {
 
-    preferred-width: 1280px;
-    preferred-height: 720px;
-
-    min-height: 720px;
+    preferred-width: 1440px;
+    preferred-height: 900px;
+    min-width: 1024px;
+    min-height: 700px;
     in-out property <int> active_layout_mode: 0;
 
-    // Keep your menu callbacks if needed for Rust logic, but the UI state handles instantly here!
     callback vertical_layout();
     callback horizontal_layout();
 
     in-out property <bool> show_alert: false;
     in-out property <string> alert_message: "";
-
     public function trigger_alert(msg: string) {
         root.alert_message = msg;
         root.show_alert = true;
@@ -148,6 +203,7 @@ export component AppWindow inherits Window {
     property <bool> network_expanded: false;
     property <bool> actions_expanded: false;
     property <bool> layout_expanded: false;
+    property <bool> connectors_expanded: false;
     in-out property <[SymbolEntry]> all_symbols: [];
 
     in-out property <[Connection]> connections: [];
@@ -156,12 +212,7 @@ export component AppWindow inherits Window {
 
     property <bool> prevent_placement: false;
 
-    // =========================
-    // DRAG & DROP STATE
-    // =========================
-
     in-out property <bool> is_dragging: false;
-
     in-out property <string> drag_name: "";
     in-out property <int> creation_mode: 0;
     in-out property <string> drag_type: "";
@@ -171,19 +222,13 @@ export component AppWindow inherits Window {
     in-out property <bool> show_node_modal: false;
 
     in-out property <string> edit_label: "";
-
     in-out property <string> edit_value: "";
 
     in-out property <int> editing_index: -1;
 
     callback save_node_properties(int, string, string);
 
-    // =========================
-    // CALLBACKS
-    // =========================
-
     callback select_library_symbol(string);
-
     callback place_symbol(string, string, string, float, float, int);
 
     callback update_symbol_position(int, float, float);
@@ -193,7 +238,6 @@ export component AppWindow inherits Window {
     callback clear_canvas();
 
     callback import_xml();
-
     callback handle_port_click(int, bool, int, string);
 
     callback select_connection(int);
@@ -203,1143 +247,1047 @@ export component AppWindow inherits Window {
     callback load_flow();
 
     HorizontalLayout {
-
-        // =========================
-        // SIDEBAR
-        // =========================
+        width: 100%;
+        height: 100%;
 
         Rectangle {
-
             width: 260px;
-
             background: #f7f7f7;
-
             border-width: 1px;
-
             border-color: #dcdcdc;
 
             VerticalLayout {
-
-                padding: 12px;
-
+                padding: 10px;
                 spacing: 10px;
 
-                // ====================================
-// COMMON CATEGORY
-// ====================================
+                Flickable {
+                    vertical-stretch: 1;
+                    viewport-height: sidebar-content.min-height;
+                    //clip: true;
 
-Rectangle {
+                    sidebar-content := VerticalLayout {
+                        alignment: start;
+                        spacing: 10px;
 
-                    height: 36px;
+                        Rectangle {
+                            height: 36px;
+                            background: rgb(166, 187, 207);
+                            border-radius: 4px;
 
-                    background: rgb(166, 187, 207);
+                            Text {
+                                text: (root.common_expanded ? "▼ " : "▶ ") + "Common";
+                                color: white;
+                                font-weight: 700;
+                                x: 10px;
+                                vertical-alignment: center;
+                                height: parent.height;
+                            }
 
-                    border-radius: 4px;
-
-                    Text {
-
-                        text: (root.common_expanded ? "▼ " : "▶ ") + "Common";
-
-                        color: white;
-
-                        font-weight: 700;
-
-                        x: 10px;
-
-                        vertical-alignment: center;
-
-                        height: parent.height;
-                    }
-
-                    TouchArea {
-
-                        clicked => {
-
-                            let was_open = root.common_expanded;
-
-                            root.common_expanded = false;
-                            root.function_expanded = false;
-                            root.network_expanded = false;
-                            root.actions_expanded = false;
-                            root.dashboard_expanded = false;
-                            root.storage_expanded = false;
-                            root.parser_expanded = false;
-                            root.layout_expanded = false;
-                            root.common_expanded = !was_open;
-                        }
-                    }
-                }
-
-                if (root.common_expanded): VerticalLayout {
-
-                    spacing: 6px;
-
-                    for node in [
-                        { name: "Text", node_type: "ui_text" },
-                        { name: "Button", node_type: "ui_button" },
-                        { name: "Dropdown", node_type: "ui_dropdown" }
-                    ]: Rectangle {
-
-                        height: 35px;
-
-                        background: common-touch.has-hover ? #e2dfed : #edebf4;
-                        border-radius: 4px;
-                        animate background { duration: 150ms; }
-
-                        Text {
-
-                            text: node.name;
-
-                            color: black;
-
-                            x: 10px;
-
-                            vertical-alignment: center;
-
-                            height: parent.height;
+                            TouchArea {
+                                clicked => {
+                                    let was_open = root.common_expanded;
+                                    root.common_expanded = false;
+                                    root.function_expanded = false;
+                                    root.network_expanded = false;
+                                    root.actions_expanded = false;
+                                    root.dashboard_expanded = false;
+                                    root.storage_expanded = false;
+                                    root.parser_expanded = false;
+                                    root.layout_expanded = false;
+                                    root.common_expanded = !was_open;
+                                }
+                            }
                         }
 
-                        common-touch := TouchArea {
+                        if (root.common_expanded): VerticalLayout {
+                            spacing: 6px;
+                            for node in [
+                                { name: "Text", node_type: "ui_text" },
+                                { name: "Button", node_type: "ui_button" },
+                                { name: "Dropdown", node_type: "ui_dropdown" }
+                            ]: Rectangle {
+                                height: 35px;
+                                background: common-touch.has-hover ? #e2dfed : #edebf4;
+                                border-radius: 4px;
+                                animate background { duration: 150ms; }
 
-                            moved => {
+                                Text {
+                                    text: node.name;
+                                    color: black;
+                                    x: 10px;
+                                    vertical-alignment: center;
+                                    height: parent.height;
+                                }
 
-                                root.is_dragging = true;
+                                common-touch := TouchArea {
+                                    moved => {
+                                        root.is_dragging = true;
+                                        root.drag_name = node.name;
+                                        root.drag_type = node.node_type;
+                                        root.select_library_symbol(node.name);
+                                        root.drag_x = (self.mouse-x + parent.x) / 1px;
+                                        root.drag_y = (self.mouse-y + parent.y) / 1px;
+                                        root.creation_mode = root.active_layout_mode;
+                                    }
+                                }
+                            }
+                        }
 
-                                root.drag_name = node.name;
-                                root.drag_type = node.node_type;
+                        Rectangle {
+                            height: 36px;
+                            background: rgb(253, 208, 162);
+                            border-radius: 4px;
 
-                                root.select_library_symbol(node.name);
+                            Text {
+                                text: (root.function_expanded ? "▼ " : "▶ ") + "Function";
+                                color: white;
+                                x: 10px;
+                                vertical-alignment: center;
+                                height: parent.height;
+                            }
 
-                                root.drag_x = (self.mouse-x + parent.x) / 1px;
+                            TouchArea {
+                                clicked => {
+                                    let was_open = root.function_expanded;
+                                    root.common_expanded = false;
+                                    root.function_expanded = false;
+                                    root.network_expanded = false;
+                                    root.actions_expanded = false;
+                                    root.dashboard_expanded = false;
+                                    root.storage_expanded = false;
+                                    root.parser_expanded = false;
+                                    root.layout_expanded = false;
+                                    root.function_expanded = !was_open;
+                                }
+                            }
+                        }
 
-                                root.drag_y = (self.mouse-y + parent.y) / 1px;
-                                root.creation_mode = root.active_layout_mode;
+                        if (root.function_expanded): VerticalLayout {
+                            spacing: 6px;
+                            for node in ["Switch", "Change", "Range", "Delay", "Trigger"]: Rectangle {
+                                height: 35px;
+                                background: function-touch.has-hover ? #e2dfed : #edebf4;
+                                border-radius: 4px;
+                                animate background { duration: 150ms; }
+
+                                Text {
+                                    text: node;
+                                    color: black;
+                                    x: 10px;
+                                    vertical-alignment: center;
+                                    height: parent.height;
+                                }
+
+                                function_touch := TouchArea {
+                                    moved => {
+                                        root.is_dragging = true;
+                                        root.drag_name = node;
+                                        root.select_library_symbol(node);
+                                        root.drag_x = (self.mouse-x + parent.x) / 1px;
+                                        root.drag_y = (self.mouse-y + parent.y) / 1px;
+                                    }
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            height: 36px;
+                            background: rgb(222, 189, 92);
+                            border-radius: 4px;
+
+                            Text {
+                                text: (root.parser_expanded ? "▼ " : "▶ ") + "Parser";
+                                color: white;
+                                font-weight: 700;
+                                x: 10px;
+                                vertical-alignment: center;
+                                height: parent.height;
+                            }
+
+                            TouchArea {
+                                clicked => {
+                                    let was_open = root.parser_expanded;
+                                    root.common_expanded = false;
+                                    root.function_expanded = false;
+                                    root.network_expanded = false;
+                                    root.actions_expanded = false;
+                                    root.dashboard_expanded = false;
+                                    root.storage_expanded = false;
+                                    root.parser_expanded = false;
+                                    root.layout_expanded = false;
+                                    root.parser_expanded = !was_open;
+                                }
+                            }
+                        }
+
+                        if (root.parser_expanded): VerticalLayout {
+                            spacing: 6px;
+                            for node in ["Json", "Xml", "Csv", "Html"]: Rectangle {
+                                height: 35px;
+                                background: parser-touch.has-hover ? #e2dfed : #edebf4;
+                                border-radius: 4px;
+                                animate background { duration: 150ms; }
+
+                                Text {
+                                    text: node;
+                                    color: black;
+                                    x: 10px;
+                                    vertical-alignment: center;
+                                    height: parent.height;
+                                }
+
+                                parser_touch := TouchArea {
+                                    moved => {
+                                        root.is_dragging = true;
+                                        root.drag_name = node;
+                                        root.select_library_symbol(node);
+                                        root.drag_x = (self.mouse-x + parent.x) / 1px;
+                                        root.drag_y = (self.mouse-y + parent.y) / 1px;
+                                        root.creation_mode = root.active_layout_mode;
+                                    }
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            height: 36px;
+                            background: burlywood;
+                            border-radius: 4px;
+
+                            Text {
+                                text: (root.storage_expanded ? "▼ " : "▶ ") + "Storage";
+                                color: white;
+                                x: 10px;
+                                vertical-alignment: center;
+                                height: parent.height;
+                            }
+
+                            TouchArea {
+                                clicked => {
+                                    let was_open = root.storage_expanded;
+                                    root.common_expanded = false;
+                                    root.function_expanded = false;
+                                    root.network_expanded = false;
+                                    root.actions_expanded = false;
+                                    root.dashboard_expanded = false;
+                                    root.storage_expanded = false;
+                                    root.parser_expanded = false;
+                                    root.layout_expanded = false;
+                                    root.storage_expanded = !was_open;
+                                }
+                            }
+                        }
+
+                        if (root.storage_expanded): VerticalLayout {
+                            spacing: 6px;
+                            for node in ["Text", "Button", "Dropdown"]: Rectangle {
+                                height: 35px;
+                                background: storage-touch.has-hover ? #e2dfed : #edebf4;
+                                border-radius: 4px;
+                                animate background { duration: 150ms; }
+
+                                Text {
+                                    text: node;
+                                    color: black;
+                                    x: 10px;
+                                    vertical-alignment: center;
+                                    height: parent.height;
+                                }
+
+                                storage_touch := TouchArea {
+                                    moved => {
+                                        root.is_dragging = true;
+                                        root.drag_name = node;
+                                        root.select_library_symbol(node);
+                                        root.drag_x = (self.mouse-x + parent.x) / 1px;
+                                        root.drag_y = (self.mouse-y + parent.y) / 1px;
+                                        root.creation_mode = root.active_layout_mode;
+                                    }
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            height: 36px;
+                            background: rgb(119, 198, 204);
+                            border-radius: 4px;
+
+                            Text {
+                                text: (root.dashboard_expanded ? "▼ " : "▶ ") + "Dashboard";
+                                color: white;
+                                x: 10px;
+                                vertical-alignment: center;
+                                height: parent.height;
+                            }
+
+                            TouchArea {
+                                clicked => {
+                                    let was_open = root.dashboard_expanded;
+                                    root.common_expanded = false;
+                                    root.function_expanded = false;
+                                    root.network_expanded = false;
+                                    root.actions_expanded = false;
+                                    root.dashboard_expanded = false;
+                                    root.storage_expanded = false;
+                                    root.parser_expanded = false;
+                                    root.layout_expanded = false;
+                                    root.dashboard_expanded = !was_open;
+                                }
+                            }
+                        }
+
+                        if (root.dashboard_expanded): VerticalLayout {
+                            spacing: 6px;
+                            for node in ["Chart", "Gauge", "Slider"]: Rectangle {
+                                height: 35px;
+                                background: dashboard-touch.has-hover ? #e2dfed : #edebf4;
+                                border-radius: 4px;
+                                animate background { duration: 150ms; }
+
+                                Text {
+                                    text: node;
+                                    color: #222;
+                                    x: 10px;
+                                    vertical-alignment: center;
+                                    height: parent.height;
+                                }
+
+                                dashboard_touch := TouchArea {
+                                    moved => {
+                                        root.is_dragging = true;
+                                        root.drag_name = node;
+                                        root.select_library_symbol(node);
+                                        root.drag_x = (self.mouse-x + parent.x) / 1px;
+                                        root.drag_y = (self.mouse-y + parent.y) / 1px;
+                                        root.creation_mode = root.active_layout_mode;
+                                    }
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            height: 36px;
+                            background: rgb(215, 215, 160);
+                            border-radius: 4px;
+
+                            Text {
+                                text: (root.network_expanded ? "▼ " : "▶ ") + "Network";
+                                color: white;
+                                font-weight: 700;
+                                x: 10px;
+                                vertical-alignment: center;
+                                height: parent.height;
+                            }
+
+                            TouchArea {
+                                clicked => {
+                                    let was_open = root.network_expanded;
+                                    root.common_expanded = false;
+                                    root.function_expanded = false;
+                                    root.network_expanded = false;
+                                    root.actions_expanded = false;
+                                    root.dashboard_expanded = false;
+                                    root.storage_expanded = false;
+                                    root.parser_expanded = false;
+                                    root.layout_expanded = false;
+                                    root.network_expanded = !was_open;
+                                }
+                            }
+                        }
+
+                        if (root.network_expanded): VerticalLayout {
+                            spacing: 6px;
+                            for node in ["MQTT", "HTTP", "TCP"]: Rectangle {
+                                height: 35px;
+                                background: network-touch.has-hover ? #e2dfed : #edebf4;
+                                border-radius: 4px;
+                                animate background { duration: 150ms; }
+                                Text {
+                                    text: node;
+                                    color: #222;
+                                    x: 10px;
+                                    vertical-alignment: center;
+                                    height: parent.height;
+                                }
+
+                                network_touch := TouchArea {
+                                    moved => {
+                                        root.is_dragging = true;
+                                        root.drag_name = node;
+                                        root.select_library_symbol(node);
+                                        root.drag_x = (self.mouse-x + parent.x) / 1px;
+                                        root.drag_y = (self.mouse-y + parent.y) / 1px;
+                                        root.creation_mode = root.active_layout_mode;
+                                    }
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            height: 36px;
+                            background: #edd1d1;
+                            Text {
+                                text: (root.actions_expanded ? "▼ " : "▶ ") + "Actions";
+                                color: white;
+                                x: 10px;
+                                vertical-alignment: center;
+                                height: parent.height;
+                            }
+
+                            TouchArea {
+                                clicked => {
+                                    let was_open = root.actions_expanded;
+                                    root.common_expanded = false;
+                                    root.function_expanded = false;
+                                    root.network_expanded = false;
+                                    root.actions_expanded = false;
+                                    root.dashboard_expanded = false;
+                                    root.storage_expanded = false;
+                                    root.parser_expanded = false;
+                                    root.layout_expanded = false;
+                                    root.actions_expanded = !was_open;
+                                }
+                            }
+                        }
+
+                        if (root.actions_expanded): VerticalLayout {
+                            spacing: 6px;
+                            for node in ["Delete Node", "Delete Wire", "Clear All", "Save Flow", "Load Flow"]: Rectangle {
+                                height: 35px;
+                                background: actions-touch.has-hover ? #e2dfed : #edebf4;
+                                border-radius: 4px;
+                                animate background { duration: 150ms; }
+
+                                Text {
+                                    text: node;
+                                    color: #222;
+                                    x: 10px;
+                                    vertical-alignment: center;
+                                    height: parent.height;
+                                }
+
+                                actions-touch := TouchArea {
+                                    clicked => {
+                                        if (node == "Delete Wire") {
+                                            root.delete_selected_connection();
+                                        } else if (node == "Delete Node") {
+                                            root.delete_selected_symbol();
+                                        } else if (node == "Save Flow") {
+                                            root.save_flow();
+                                        } else if (node == "Load Flow") {
+                                            root.load_flow();
+                                        } else if (node == "Clear All") {
+                                            root.clear_canvas();
+                                        } else {
+                                            root.is_dragging = true;
+                                            root.drag_name = node;
+                                            root.select_library_symbol(node);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            height: 36px;
+                            background: #266df2;
+                            border-radius: 4px;
+                            Text {
+                                text: (root.layout_expanded ? "▼ " : "▶ ") + "Layout";
+                                color: white;
+                                x: 10px;
+                                vertical-alignment: center;
+                                height: parent.height;
+                            }
+
+                            TouchArea {
+                                clicked => {
+                                    let was_open = root.layout_expanded;
+                                    root.common_expanded = false;
+                                    root.function_expanded = false;
+                                    root.network_expanded = false;
+                                    root.actions_expanded = false;
+                                    root.dashboard_expanded = false;
+                                    root.storage_expanded = false;
+                                    root.parser_expanded = false;
+                                    root.layout_expanded = false;
+                                    root.layout_expanded = !was_open;
+                                }
+                            }
+                        }
+
+                        if (root.layout_expanded): VerticalLayout {
+                            spacing: 6px;
+                            for node in ["Horizontal", "Vertical", "Both"]: Rectangle {
+                                height: 35px;
+                                background: layout-touch.has-hover ? #e2dfed : #edebf4;
+                                border-radius: 4px;
+                                animate background { duration: 150ms; }
+
+                                Text {
+                                    text: node;
+                                    color: #222;
+                                    x: 10px;
+                                    vertical-alignment: center;
+                                    height: parent.height;
+                                }
+
+                                layout-touch := TouchArea {
+                                    clicked => {
+                                        if (node == "Horizontal") {
+                                            root.active_layout_mode = 0;
+                                            root.horizontal_layout();
+                                        } else if (node == "Vertical") {
+                                            root.active_layout_mode = 1;
+                                            root.vertical_layout();
+                                        } else if (node == "Both") {
+                                            root.active_layout_mode = 2;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            height: 36px;
+                            background: #bbebb2;
+                            Text {
+                                text: (root.connectors_expanded ? "▼ " : "▶ ") + "Connectors";
+                                color: white;
+                                x: 10px;
+                                vertical-alignment: center;
+                                height: parent.height;
+                            }
+
+                            TouchArea {
+                                clicked => {
+                                    let was_open = root.connectors_expanded;
+                                    root.common_expanded = false;
+                                    root.function_expanded = false;
+                                    root.network_expanded = false;
+                                    root.actions_expanded = false;
+                                    root.dashboard_expanded = false;
+                                    root.storage_expanded = false;
+                                    root.parser_expanded = false;
+                                    root.layout_expanded = false;
+                                    root.connectors_expanded = !was_open;
+                                }
+                            }
+                        }
+
+                        if (root.connectors_expanded): VerticalLayout {
+                            spacing: 6px;
+                            for node in [{ name: "A", node_type: "ip_connector" }, { name: "B", node_type: "op_connector" }]: Rectangle {
+                                height: 35px;
+                                background: connectors_touch.has-hover ? #e2dfed : #edebf4;
+                                border-radius: 4px;
+                                animate background { duration: 150ms; }
+
+                                Text {
+                                    text: node.name;
+                                    color: #222;
+                                    x: 10px;
+                                    vertical-alignment: center;
+                                    height: parent.height;
+                                }
+
+                                connectors_touch := TouchArea {
+                                    moved => {
+                                        root.is_dragging = true;
+                                        root.drag_name = node.name;
+                                        root.drag_type = node.node_type;
+                                        root.select_library_symbol(node.name);
+                                        root.drag_x = (self.mouse-x + parent.x) / 1px;
+                                        root.drag_y = (self.mouse-y + parent.y) / 1px;
+                                        root.creation_mode = root.active_layout_mode;
+                                    }
+                                }
                             }
                         }
                     }
                 }
+
                 Rectangle {
+                    height: 40px;
+                    vertical-stretch: 0;
+                    HorizontalLayout {
+                        spacing: 10px;
 
-                    height: 36px;
-
-                    background: rgb(253, 208, 162);
-
-                    border-radius: 4px;
-
-                    Text {
-
-                        text: (root.function_expanded ? "▼ " : "▶ ") + "Function";
-
-                        color: white;
-
-                        x: 10px;
-
-                        vertical-alignment: center;
-
-                        height: parent.height;
-                    }
-
-                    TouchArea {
-
-                        clicked => {
-
-                            let was_open = root.function_expanded;
-
-                            root.common_expanded = false;
-                            root.function_expanded = false;
-                            root.network_expanded = false;
-                            root.actions_expanded = false;
-                            root.dashboard_expanded = false;
-                            root.storage_expanded = false;
-                            root.parser_expanded = false;
-                            root.layout_expanded = false;
-
-                            root.function_expanded = !was_open;
-                        }
-                    }
-                }
-
-                if (root.function_expanded): VerticalLayout {
-
-                    spacing: 6px;
-
-                    for node in ["Switch", "Change", "Range", "Delay", "Trigger"]: Rectangle {
-
-                        height: 35px;
-
-                        background: function-touch.has-hover ? #e2dfed : #edebf4;
-                        border-radius: 4px;
-                        animate background { duration: 150ms; }
-
-                        Text {
-
-                            text: node;
-
-                            color: black;
-
-                            x: 10px;
-
-                            vertical-alignment: center;
-
-                            height: parent.height;
-                        }
-
-                        function_touch := TouchArea {
-
-                            moved => {
-
-                                root.is_dragging = true;
-
-                                root.drag_name = node;
-
-                                root.select_library_symbol(node);
-
-                                root.drag_x = (self.mouse-x + parent.x) / 1px;
-
-                                root.drag_y = (self.mouse-y + parent.y) / 1px;
+                        // Delete Button
+    Rectangle {
+                            background: #e06c75; // Reddish
+        border-radius: 4px;
+                            Button {
+                                text: "Del ";
+                                width: 100%;
+                                height: 100%;
+                                clicked => {
+                                    if (root.selected_index != -1) {
+                                        root.delete_selected_symbol();
+                                    } else {
+                        // Otherwise fall back to deleting the selected wire/connection
+                        root.delete_selected_connection();
+                                    }
+                                }
                             }
                         }
-                    }
-                }
-                Rectangle {
 
-                    height: 36px;
-
-                    background: rgb(222, 189, 92);
-
-                    border-radius: 4px;
-
-                    Text {
-
-                        text: (root.parser_expanded ? "▼ " : "▶ ") + "Parser";
-
-                        color: white;
-
-                        font-weight: 700;
-
-                        x: 10px;
-
-                        vertical-alignment: center;
-
-                        height: parent.height;
-                    }
-
-                    TouchArea {
-
-                        clicked => {
-
-                            let was_open = root.parser_expanded;
-
-                            root.common_expanded = false;
-                            root.function_expanded = false;
-                            root.network_expanded = false;
-                            root.actions_expanded = false;
-                            root.dashboard_expanded = false;
-                            root.storage_expanded = false;
-                            root.parser_expanded = false;
-                            root.layout_expanded = false;
-
-                            root.parser_expanded = !was_open;
-                        }
-                    }
-                }
-
-                if (root.parser_expanded): VerticalLayout {
-
-                    spacing: 6px;
-
-                    for node in ["Json", "Xml", "Csv", "Html"]: Rectangle {
-
-                        height: 35px;
-
-                        background: parser-touch.has-hover ? #e2dfed : #edebf4;
-                        border-radius: 4px;
-                        animate background { duration: 150ms; }
-
-                        Text {
-
-                            text: node;
-
-                            color: black;
-
-                            x: 10px;
-
-                            vertical-alignment: center;
-
-                            height: parent.height;
-                        }
-
-                        parser_touch := TouchArea {
-
-                            moved => {
-
-                                root.is_dragging = true;
-
-                                root.drag_name = node;
-
-                                root.select_library_symbol(node);
-
-                                root.drag_x = (self.mouse-x + parent.x) / 1px;
-
-                                root.drag_y = (self.mouse-y + parent.y) / 1px;
-                                root.creation_mode = root.active_layout_mode;
+                        Rectangle {
+                            background: #d19a66; // Orange/Brown
+        border-radius: 4px;
+                            Button {
+                                text: "Clr ";
+                                width: 100%;
+                                height: 100%;
+                                clicked => {
+                                    root.clear_canvas();
+                                }
                             }
                         }
-                    }
-                }
-                Rectangle {
 
-                    height: 36px;
-
-                    background: burlywood;
-
-                    border-radius: 4px;
-
-                    Text {
-
-                        text: (root.storage_expanded ? "▼ " : "▶ ") + "Storage";
-
-                        color: white;
-
-                        x: 10px;
-
-                        vertical-alignment: center;
-
-                        height: parent.height;
-                    }
-
-                    TouchArea {
-
-                        clicked => {
-
-                            let was_open = root.storage_expanded;
-
-                            root.common_expanded = false;
-                            root.function_expanded = false;
-                            root.network_expanded = false;
-                            root.actions_expanded = false;
-                            root.dashboard_expanded = false;
-                            root.storage_expanded = false;
-                            root.parser_expanded = false;
-                            root.layout_expanded = false;
-
-                            root.storage_expanded = !was_open;
-                        }
-                    }
-                }
-
-                if (root.storage_expanded): VerticalLayout {
-
-                    spacing: 6px;
-
-                    for node in ["Text", "Button", "Dropdown"]: Rectangle {
-
-                        height: 35px;
-
-                        background: storage-touch.has-hover ? #e2dfed : #edebf4;
-                        border-radius: 4px;
-                        animate background { duration: 150ms; }
-
-                        Text {
-
-                            text: node;
-
-                            color: black;
-
-                            x: 10px;
-
-                            vertical-alignment: center;
-
-                            height: parent.height;
-                        }
-
-                        storage_touch := TouchArea {
-
-                            moved => {
-
-                                root.is_dragging = true;
-
-                                root.drag_name = node;
-
-                                root.select_library_symbol(node);
-
-                                root.drag_x = (self.mouse-x + parent.x) / 1px;
-
-                                root.drag_y = (self.mouse-y + parent.y) / 1px;
-                                root.creation_mode = root.active_layout_mode;
-                            }
-                        }
-                    }
-                }
-                // ====================================
-// DASHBOARD CATEGORY
-// ====================================
-
-Rectangle {
-
-                    height: 36px;
-
-                    background: rgb(119, 198, 204);
-
-                    border-radius: 4px;
-
-                    Text {
-
-                        text: (root.dashboard_expanded ? "▼ " : "▶ ") + "Dashboard";
-
-                        color: white;
-
-                        x: 10px;
-
-                        vertical-alignment: center;
-
-                        height: parent.height;
-                    }
-
-                    TouchArea {
-
-                        clicked => {
-
-                            let was_open = root.dashboard_expanded;
-
-                            root.common_expanded = false;
-                            root.function_expanded = false;
-                            root.network_expanded = false;
-                            root.actions_expanded = false;
-                            root.dashboard_expanded = false;
-                            root.storage_expanded = false;
-                            root.parser_expanded = false;
-                            root.layout_expanded = false;
-
-                            root.dashboard_expanded = !was_open;
-                        }
-                    }
-                }
-
-                if (root.dashboard_expanded): VerticalLayout {
-
-                    spacing: 6px;
-
-                    for node in ["Chart", "Gauge", "Slider"]: Rectangle {
-
-                        height: 35px;
-
-                        background: dashboard-touch.has-hover ? #e2dfed : #edebf4;
-                        border-radius: 4px;
-                        animate background { duration: 150ms; }
-
-                        Text {
-
-                            text: node;
-
-                            color: #222;
-
-                            x: 10px;
-
-                            vertical-alignment: center;
-
-                            height: parent.height;
-                        }
-
-                        dashboard_touch := TouchArea {
-
-                            moved => {
-
-                                root.is_dragging = true;
-
-                                root.drag_name = node;
-
-                                root.select_library_symbol(node);
-
-                                root.drag_x = (self.mouse-x + parent.x) / 1px;
-
-                                root.drag_y = (self.mouse-y + parent.y) / 1px;
-                                root.creation_mode = root.active_layout_mode;
-                            }
-                        }
-                    }
-                }
-
-                // ====================================
-// NETWORK CATEGORY
-// ====================================
-
-Rectangle {
-
-                    height: 36px;
-
-                    background: rgb(215, 215, 160);
-
-                    border-radius: 4px;
-
-                    Text {
-
-                        text: (root.network_expanded ? "▼ " : "▶ ") + "Network";
-
-                        color: white;
-
-                        font-weight: 700;
-
-                        x: 10px;
-
-                        vertical-alignment: center;
-
-                        height: parent.height;
-                    }
-
-                    TouchArea {
-
-                        clicked => {
-
-                            let was_open = root.network_expanded;
-
-                            root.common_expanded = false;
-                            root.function_expanded = false;
-                            root.network_expanded = false;
-                            root.actions_expanded = false;
-                            root.dashboard_expanded = false;
-                            root.storage_expanded = false;
-                            root.parser_expanded = false;
-                            root.layout_expanded = false;
-
-                            root.network_expanded = !was_open;
-                        }
-                    }
-                }
-
-                if (root.network_expanded): VerticalLayout {
-
-                    spacing: 6px;
-
-                    for node in ["MQTT", "HTTP", "TCP"]: Rectangle {
-
-                        height: 35px;
-
-                        background: network-touch.has-hover ? #e2dfed : #edebf4;
-                        border-radius: 4px;
-                        animate background { duration: 150ms; }
-                        Text {
-
-                            text: node;
-
-                            color: #222;
-
-                            x: 10px;
-
-                            vertical-alignment: center;
-
-                            height: parent.height;
-                        }
-
-                        network_touch := TouchArea {
-
-                            moved => {
-
-                                root.is_dragging = true;
-
-                                root.drag_name = node;
-
-                                root.select_library_symbol(node);
-
-                                root.drag_x = (self.mouse-x + parent.x) / 1px;
-
-                                root.drag_y = (self.mouse-y + parent.y) / 1px;
-                                root.creation_mode = root.active_layout_mode;
-                            }
-                        }
-                    }
-                }
-                Rectangle {
-
-                    height: 36px;
-
-                    background: #edd1d1;
-                    Text {
-
-                        text: (root.actions_expanded ? "▼ " : "▶ ") + "Actions";
-
-                        color: white;
-
-                        x: 10px;
-
-                        vertical-alignment: center;
-
-                        height: parent.height;
-                    }
-
-                    TouchArea {
-
-                        clicked => {
-
-                            let was_open = root.actions_expanded;
-
-                            root.common_expanded = false;
-                            root.function_expanded = false;
-                            root.network_expanded = false;
-                            root.actions_expanded = false;
-                            root.dashboard_expanded = false;
-                            root.storage_expanded = false;
-                            root.parser_expanded = false;
-                            root.layout_expanded = false;
-
-                            root.actions_expanded = !was_open;
-                        }
-                    }
-                }
-
-                if (root.actions_expanded): VerticalLayout {
-
-                    spacing: 6px;
-
-                    for node in ["Delete Node", "Delete Wire", "Clear All", "Save Flow", "Load Flow"]: Rectangle {
-
-                        height: 35px;
-                        background: actions-touch.has-hover ? #e2dfed : #edebf4;
-                        border-radius: 4px;
-                        animate background { duration: 150ms; }
-
-                        Text {
-
-                            text: node;
-
-                            color: #222;
-
-                            x: 10px;
-
-                            vertical-alignment: center;
-
-                            height: parent.height;
-                        }
-
-                        actions-touch := TouchArea {
-
-                            clicked => {
-
-                                if (node == "Delete Wire") {
-
-                                    root.delete_selected_connection();
-                                } else if (node == "Delete Node") {
-
-           // root.delete_selected_symbol();
-
-        } else if (node == "Save Flow") {
-
+                        // Import Button
+    Rectangle {
+                            background: #61afef; // Soft Blue
+        border-radius: 4px;
+                            Button {
+                                text: "Save";
+                                width: 100%;
+                                height: 100%;
+                                clicked => {
                                     root.save_flow();
-                                } else if (node == "Load Flow") {
-
-                                    root.load_flow();
-                                } else if (node == "Clear All") {
-
-           // root.clear_canvas();
-
-        } else {
-
-            // NORMAL DRAGGABLE NODES
-
-            root.is_dragging = true;
-
-                                    root.drag_name = node;
-
-                                    root.select_library_symbol(node);
                                 }
                             }
                         }
-                    }
-                }
-                Rectangle {
-                    height: 36px;
-                    background: #266df2;
-                    border-radius: 4px;
-                    Text {
-                        text: (root.layout_expanded ? "▼ " : "▶ ") + "Layout";
-                        color: white;
-                        x: 10px;
-                        vertical-alignment: center;
-                        height: parent.height;
-                    }
 
-                    TouchArea {
-                        clicked => {
-                            let was_open = root.layout_expanded;
-                            root.common_expanded = false;
-                            root.function_expanded = false;
-                            root.network_expanded = false;
-                            root.actions_expanded = false;
-                            root.dashboard_expanded = false;
-                            root.storage_expanded = false;
-                            root.parser_expanded = false;
-                            root.layout_expanded = false;
-                            root.layout_expanded = !was_open;
-                        }
-                    }
-                }
-
-                if (root.layout_expanded): VerticalLayout {
-                    spacing: 6px;
-                    for node in ["Horizontal", "Vertical", "Both"]: Rectangle {
-                        height: 35px;
-                        background: layout-touch.has-hover ? #e2dfed : #edebf4;
-                        border-radius: 4px;
-                        animate background { duration: 150ms; }
-
-                        Text {
-                            text: node;
-                            color: #222;
-                            x: 10px;
-                            vertical-alignment: center;
-                            height: parent.height;
-                        }
-
-                        layout-touch := TouchArea {
-                            clicked => {
-                                if (node == "Horizontal") {
-                                    root.active_layout_mode = 0;
-                                    root.horizontal_layout();
-                                } else if (node == "Vertical") {
-                                    root.active_layout_mode = 1;
-                                    root.vertical_layout();
-                                } else if (node == "Both") {
-                                    root.active_layout_mode = 2;
+                        // Export Button
+    Rectangle {
+                            background: #98c379; // Greenish
+        border-radius: 4px;
+                            Button {
+                                text: "Load";
+                                width: 100%;
+                                height: 100%;
+                                clicked => {
+                                    root.save_flow();
                                 }
                             }
                         }
-                    }
+
+                        // Clear Button
+  
+}
                 }
             }
         }
 
-        // =========================
-        // CANVAS
-        // =========================
-
         Rectangle {
+            background: #f8f5f5;
+            clip: true;
 
-            background: #f8f2f2;
-
-            // Dynamically calculate vertical lines to fill the width
-    for i in Math.ceil(parent.width / 15px): Rectangle {
-                x: i * 15px;
-                width: 0.5px;
+            for i in 250: Rectangle {
+                x: (i * 15) * 1px;
+                y: 0;
+                width: 1px;
+                height: parent.height;
                 background: #e0e0e0;
             }
 
-            // Dynamically calculate horizontal lines to fill the height
-    for i in Math.ceil(parent.height / 15px): Rectangle {
-                y: i * 15px;
-                height: 0.5px;
+            for i in 150: Rectangle {
+                x: 0;
+                y: (i * 15) * 1px;
+                width: parent.width;
+                height: 1px;
                 background: #e0e0e0;
             }
-
-            // =========================
-            // CANVAS TOUCH
-            // =========================
 
             TouchArea {
-
                 moved => {
-
                     if (root.is_dragging) {
-
                         root.drag_x = self.mouse-x / 1px;
-
                         root.drag_y = self.mouse-y / 1px;
                     }
                 }
 
                 clicked => {
-
-                    // DROP NODE
                     if (root.is_dragging) {
-
+                        let is_connector = root.drag_name == "A" || root.drag_name == "B";
+                        let shape_w = is_connector ? 60 : 120;
+                        let shape_h = is_connector ? 40 : 40;
+                        let drop_x = root.drag_x - (shape_w / 2);
+                        let drop_y = root.drag_y - (shape_h / 2);
                         root.place_symbol(
-                        root.drag_name,  // 1. name (string)
-                        root.drag_type,  // 2. node_type (string)
-                        "#0d6efd",       // 3. bg_color (string) -> Pass your target color string hex here!
-                        root.drag_x,     // 4. x coordinate (float)
-                        root.drag_y,
-                        root.creation_mode     // 5. y coordinate (float)
-                    );
-
+                            root.drag_name,   
+                            root.drag_type,                    
+                            "#0d6efd",          
+                            drop_x,                          
+                            drop_y, 
+                            root.active_layout_mode);
                         root.is_dragging = false;
                     } else if (root.selected_index != -1) {
-
                         root.selected_index = -1;
                     }
                 }
-            }
 
-            // =========================
-            // DRAG PREVIEW
-            // =========================
+                if (root.is_dragging): Rectangle {
+                    property <bool> is_InputConnector: root.drag_type == "ip_connector";
+                    property <bool> is_OutConnector: root.drag_type == "op_connector";
+                    width: is_InputConnector || is_OutConnector ? 60px : 120px;
+                    height: is_InputConnector || is_OutConnector ? 40px : 40px;
+                    x: root.drag_x * 1px - (self.width / 2);
+                    y: root.drag_y * 1px - (self.height / 2);
+                    opacity: 0.5;
 
-            if (root.is_dragging): Rectangle {
-
-                x: root.drag_x * 1px - 60px;
-
-                y: root.drag_y * 1px - 20px;
-
-                width: 120px;
-
-                height: 40px;
-
-                opacity: 0.5;
-
-                NodeSymbol {
-
-                    label: root.drag_name;
-                    creation_mode: root.active_layout_mode;
-                }
-            }
-
-            for item[i] in root.all_symbols: Rectangle {
-                z: 2;
-
-                x: item.x * 1px - 60px;
-
-                y: item.y * 1px - 20px;
-
-                width: 120px;
-
-                height: 40px;
-
-                if (root.selected_index == i): Rectangle {
-
-                    border-width: 3px;
-
-                    border-radius: 4px;
-
-                    border-color: #0288d1;
-                }
-
-                NodeSymbol {
-
-                    label: item.label == "" ? item.name : item.label;
-                    creation_mode: item.creation_mode;
-
-                    port_clicked(is_input, port_name) => {
-
-                        root.handle_port_click(
-                            i,
-                            is_input,
-                            item.creation_mode,
-                            port-name);
+                    if (is_InputConnector): InputConnectorSymbol {
+                        width: 100%;
+                        height: 100%;
+                        label: root.drag_name;
+                    }
+                    if (is_OutConnector): OutputConnectorSymbol {
+                        width: 100%;
+                        height: 100%;
+                        label: root.drag_name;
+                    }
+                    if (!is_InputConnector && !is_OutConnector): NodeSymbol {
+                        width: 100%;
+                        height: 100%;
+                        label: root.drag_name;
+                        creation_mode: root.active_layout_mode;
                     }
                 }
 
-                TouchArea {
+                for item[i] in root.all_symbols: Rectangle {
+                    z: 2;
+                    property <bool> is_InputConnector: item.node_type == "ip_connector";
+                    property <bool> is_OutConnector: item.node_type == "op_connector";
+                    property <bool> is_connector: is_InputConnector || is_OutConnector;
+                    width: is_connector ? 60px : 120px;
+                    height: is_connector ? 40px : 40px;
+                    x: item.x * 1px - 60px;
+                    y: item.y * 1px - 20px;
 
-                    width: 100%;
-
-                    height: 100%;
-
-                    double-clicked => {
-
-                        root.selected_index = i;
-
-                        root.prevent_placement = true;
-
-                        root.editing_index = i;
-
-                        root.edit_label = item.label;
-
-                        root.edit_value = item.value;
-
-                        root.show_node_modal = true;
+                    if (root.selected_index == i): Rectangle {
+                        border-width: 3px;
+                        border-radius: 4px;
+                        border-color: #0288d1;
                     }
 
-                    moved => {
-
-                        root.update_symbol_position(
-                            i,
-                            (self.mouse-x + parent.x + 60px) / 1px,
-
-                            (self.mouse-y + parent.y + 20px) / 1px);
+                    if (is_InputConnector): InputConnectorSymbol {
+                        width: 100%;
+                        height: 100%;
+                        label: item.label == "" ? item.name : item.label;
+                        port_clicked(is_input, port_name) => {
+                            root.handle_port_click(i, is_input, item.creation_mode, port_name);
+                        }
                     }
-                }
-            }
-
-            for conn[index] in root.connections: Rectangle {
-                property <float> sx: (conn.from_port == "right") ? (root.all_symbols[conn.from_index].x + 60) : (conn.from_port == "left") ? (root.all_symbols[conn.from_index].x - 60) : (root.all_symbols[conn.from_index].x + 3);
-
-                property <float> sy: (conn.from_port == "right" || conn.from_port == "left") ? (root.all_symbols[conn.from_index].y) : (conn.from_port == "bottom") ? (root.all_symbols[conn.from_index].y + 20) : (root.all_symbols[conn.from_index].y - 20);
-
-                property <float> tx: (conn.to_port == "right") ? (root.all_symbols[conn.to_index].x + 60) : (conn.to_port == "left") ? (root.all_symbols[conn.to_index].x - 60) : (root.all_symbols[conn.to_index].x + 3);
-
-                property <float> ty: (conn.to_port == "right" || conn.to_port == "left") ? (root.all_symbols[conn.to_index].y) : (conn.to_port == "bottom") ? (root.all_symbols[conn.to_index].y + 20) : (root.all_symbols[conn.to_index].y - 20);
-                init => {
-                    debug("Connection Index:", index);
-                    debug("  From Port ->", conn.from_port);
-                    debug("  To Port   ->", conn.to_port);
-                }
-                property <float> left: Math.min(sx, tx);
-                property <float> top:  Math.min(sy, ty);
-                property <float> pad:  120;
-
-                property <float> pw:   Math.max(Math.abs(tx - sx), 1) + (pad * 2);
-                property <float> ph:   Math.max(Math.abs(ty - sy), 1) + (pad * 2);
-
-                x: (left - pad) * 1px;
-                y: (top - pad) * 1px;
-                width: pw * 1px;
-                height: ph * 1px;
-                background: transparent;
-                z: 1;
-
-              Path {
-                    visible: (conn.from_port == "right" && conn.to_port == "top");
-                    width: parent.width;
-                    height: parent.height;
-
-                    viewbox-x: 0;
-                    viewbox-y: 0;
-                    viewbox-width: pw;
-                    viewbox-height: ph;
-
-                    fill: transparent;
-                    stroke: orange;
-                    stroke-width: 2px;
-
-                    property <float> local_sx:    sx - left + pad;
-                    property <float> local_sy:    sy - top + pad;
-                    property <float> local_tx:    tx - left + pad;
-                    property <float> local_ty:    ty - top + pad;
-
-                    property <float> center_offset: -2;
-                    property <float> adjusted_sy:   local_sy + center_offset;
-                    property <float> adjusted_ty:   local_ty + center_offset;
-                    property <float> adjusted_tx:   local_tx + center_offset;
-
-                    // DIRECTION CHECKS
-                    property <bool> is_target_above: ty < sy;
-                    property <bool> is_target_left:  tx < sx;
-
-                    // DYNAMIC WAYPOINTS
-                    // Step 1: Push out from the right port to clear the source block
-                    property <float> wp_x1: local_sx + 40;
-
-                    // Step 2: Determine vertical approach path
-                    // If target is above, drop above its top port by 30px; otherwise, settle in the midpoint corridor
-                    property <float> wp_y1: is_target_above ? (local_ty - 30) : (adjusted_sy + ((local_ty - adjusted_sy) / 2));
-
-                    // Step 3: Align over the target node column
-                    // If target is physically left of the source's exit corridor, loop out wide to the right side of the layout bounding box
-                    property <float> wp_x2: (is_target_above && is_target_left) ? 
-                        (Math.max(local_sx, local_tx) + 80) : 
-                        adjusted_tx;
-
-                    MoveTo {
-                        x: local_sx;
-                        y: adjusted_sy + 1;
+                    if (is_OutConnector): OutputConnectorSymbol {
+                        width: 100%;
+                        height: 100%;
+                        label: item.label == "" ? item.name : item.label;
+                        port_clicked(is_input, port_name) => {
+                            root.handle_port_click(i, is_input, item.creation_mode, port_name);
+                        }
+                    }
+                    if (!is_connector): NodeSymbol {
+                        width: 100%;
+                        height: 100%;
+                        label: item.label == "" ? item.name : item.label;
+                        creation_mode: item.creation_mode;
+                        port_clicked(is_input, port_name) => {
+                            root.handle_port_click(i, is_input, item.creation_mode, port_name);
+                        }
                     }
 
-                    // 1. Extend right out of port
-                    LineTo {
-                        x: wp_x1;
-                        y: adjusted_sy + 1;
-                    }
-
-                    // 2. Adjust vertically to travel height
-                    LineTo {
-                        x: wp_x1;
-                        y: wp_y1;
-                    }
-
-                    // 3. Move horizontally to line up above the target's top port entry column
-                    LineTo {
-                        x: wp_x2;
-                        y: wp_y1;
-                    }
-
-                    // 4. Drop vertically straight down into the top port
-                    LineTo {
-                        x: wp_x2;
-                        y: local_ty;
+                    TouchArea {
+                        width: 100%;
+                        height: 100%;
+                        clicked => {
+                            root.selected_index = i;
+                        }
+                        double-clicked => {
+                            root.selected_index = i;
+                            root.prevent_placement = true;
+                            root.editing_index = i;
+                            root.edit_label = item.label;
+                            root.edit_value = item.value;
+                            root.show_node_modal = true;
+                        }
+                        moved => {
+                            root.update_symbol_position(
+                                i,
+                                (self.mouse-x + parent.x + 60px) / 1px,
+                                (self.mouse-y + parent.y + 20px) / 1px);
+                        }
                     }
                 }
 
-                Path {
-                    visible: (conn.from_port == "bottom" && conn.to_port == "left");
-                    width: parent.width;
-                    height: parent.height;
+                for conn[index] in root.connections: Rectangle {
+                    property <bool> isOutputConnector: root.all_symbols[conn.from_index].name == "B";
+                    property <bool> isInputConnector: root.all_symbols[conn.to_index].name == "A";
+                    property <float> from_hw: isOutputConnector ? 0 : 60;
+                    property <float> to_hw: isInputConnector ? 60 : 60;
+                    property <float> sx: (conn.from_port == "right") ? (root.all_symbols[conn.from_index].x + from_hw) : (conn.from_port == "left") ? (root.all_symbols[conn.from_index].x - from_hw) : (root.all_symbols[conn.from_index].x);
+                    property <float> sy: (conn.from_port == "right" || conn.from_port == "left") ? (root.all_symbols[conn.from_index].y) : (conn.from_port == "bottom") ? (root.all_symbols[conn.from_index].y + 20) : (root.all_symbols[conn.from_index].y - 20);
+                    property <float> tx: (conn.to_port == "right") ? (root.all_symbols[conn.to_index].x + to_hw) : (conn.to_port == "left") ? (root.all_symbols[conn.to_index].x - to_hw) : (root.all_symbols[conn.to_index].x);
+                    property <float> ty: (conn.to_port == "right" || conn.to_port == "left") ? (root.all_symbols[conn.to_index].y) : (conn.to_port == "bottom") ? (root.all_symbols[conn.to_index].y + 20) : (root.all_symbols[conn.to_index].y - 20);
 
-                    viewbox-x: 0;
-                    viewbox-y: 0;
-                    viewbox-width: pw;
-                    viewbox-height: ph;
+                    property <float> left: Math.min(sx, tx);
+                    property <float> top: Math.min(sy, ty);
+                    property <float> pad: 40;
 
-                    fill: transparent;
-                    stroke: orange;
-                    stroke-width: 2px;
-
-                    property <bool> is_forward:   tx >= sx;
-                    property <float> local_sx:    (sx - left + pad) - 1;
-                    property <float> local_sy:    sy - top + pad;
-                    property <float> local_tx:    tx - left + pad;
-                    property <float> local_ty:   ty - top + pad;
-
-                    property <float> center_offset: -2;
-                    property <float> adjusted_sy:   local_sy + center_offset;
-                    property <float> adjusted_ty:   local_ty + center_offset;
-
-                    property <float> wp_y1: local_sy + 40;
-                    property <float> wp_x:  local_tx - 40;
-
-                    MoveTo {
-                        x: local_sx + 1;
-                        y: local_sy;
-                    }
-
-                    LineTo {
-                        x: local_sx + 1;
-                        y: wp_y1;
-                    }
-
-                    LineTo {
-                        x: wp_x;
-                        y: wp_y1;
-                    }
-
-                    LineTo {
-                        x: wp_x;
-                        y: adjusted_ty + 1;
-                    }
-
-                    LineTo {
-                        x: local_tx;
-                        y: adjusted_ty + 1;
-                    }
-                }
-
-                Path {
-
-                    visible: (conn.from_port == "right" && conn.to_port == "left");
-                    width: parent.width;
-                    height: parent.height;
-
-                    viewbox-x: 0;
-                    viewbox-y: 0;
-                    viewbox-width: pw;
-                    viewbox-height: ph;
-
-                    fill: transparent;
-                    stroke: orange;
-                    stroke-width: 2px;
-
-                    property <bool> is_forward:   tx >= sx;
-                    property <float> local_sx:    sx - left + pad;
-                    property <float> local_sy:    sy - top + pad;
-                    property <float> local_tx:    tx - left + pad;
-                    property <float> local_ty:   ty - top + pad;
-
-                    property <float> center_offset: -2;
-                    property <float> adjusted_sy:   local_sy + center_offset;
-                    property <float> adjusted_ty:   local_ty + center_offset;
-
-                    property <bool> is_mixed_route: (conn.from_port == "right" || conn.from_port == "left") && (conn.to_port == "top" || conn.to_port == "bottom");
-
-                    property <float> wp_x1: is_mixed_route ? (local_sx + 40) : (is_forward ? (local_sx + (local_tx - local_sx) / 2) : (local_sx + 40));
-                    property <float> wp_y:  is_mixed_route ? (adjusted_sy + (adjusted_ty - adjusted_sy) / 2) : (is_forward ? adjusted_ty : (adjusted_sy + (adjusted_ty - adjusted_sy) / 2));
-                    property <float> wp_x2: is_mixed_route ? local_tx : (is_forward ? (local_sx + (local_tx - local_sx) / 2) : (local_tx - 40));
-
-                    MoveTo {
-                        x: local_sx;
-                        y: adjusted_sy + 2;
-                    }
-
-                    LineTo {
-                        x: wp_x1;
-                        y: adjusted_sy + 2;
-                    }
-
-                    LineTo {
-                        x: wp_x1;
-                        y: wp_y;
-                    }
-
-                    LineTo {
-                        x: wp_x2;
-                        y: wp_y;
-                    }
-
-                    LineTo {
-                        x: wp_x2;
-                        y: adjusted_ty + 2;
-                    }
-
-                    LineTo {
-                        x: local_tx;
-                        y: adjusted_ty + 2;
-                    }
-                }
-
-                Path {
-                    visible: (conn.from_port == "bottom" && conn.to_port == "top");
-                    width: parent.width;
-                    height: parent.height;
-
-                    viewbox-x: 0;
-                    viewbox-y: 0;
-                    viewbox-width: pw;
-                    viewbox-height: ph;
-
-                    fill: transparent;
-                    stroke: orange;
-                    stroke-width: 2px;
-
-                    property <float> local_sx:    sx - left + pad;
-                    property <float> local_sy:    sy - top + pad;
-                    property <float> local_tx:    tx - left + pad;
-                    property <float> local_ty:    ty - top + pad;
-
-                    property <float> center_offset: -2;
-                    property <float> adjusted_sx:   local_sx + center_offset;
-                    property <float> adjusted_tx:   local_tx + center_offset;
-
-                    property <float> mid_y:       local_sy + ((local_ty - local_sy) / 2);
                     property <bool> is_target_above: ty < sy;
 
-                    // IMPROVED MARGIN CLEARANCE LOGIC
-                    property <bool> is_target_left: tx < sx;
+                    property <float> pw: Math.max(Math.abs(tx - sx), 1) + (pad * 2);
+                    property <float> ph: (Math.max(Math.abs(ty - sy), 1) + (pad * 2)) + (is_target_above ? 40 : 0);
 
-                    // Finds the outermost edge of the shapes and applies a safe 80px corridor padding
-                    property <float> escape_x: is_target_left ? (Math.min(local_sx, local_tx) - 80) : (Math.max(local_sx, local_tx) + 80);
+                    x: (left - pad) * 1px;
+                    y: (top - pad) * 1px;
+                    width: pw * 1px;
+                    height: ph * 1px;
+                    background: transparent;
+                    z: 1;
 
-                    MoveTo {
-                        x: adjusted_sx - 1;
-                        y: local_sy;
+                    Path {
+                        visible: (conn.from_port == "right" && conn.to_port == "top");
+                        width: parent.width;
+                        height: parent.height;
+                        viewbox-x: 0;
+                        viewbox-y: 0;
+                        viewbox-width: pw;
+                        viewbox-height: ph;
+                        fill: transparent;
+                        stroke: orange;
+                        stroke-width: conn.selected ? 3px : 2px;
+                        property <float> local_sx: sx - left + pad;
+                        property <float> local_sy: sy - top + pad;
+                        property <float> local_tx: tx - left + pad;
+                        property <float> local_ty: ty - top + pad;
+                        property <float> center_offset: -2;
+                        property <float> adjusted_sy: local_sy + center_offset;
+                        property <float> adjusted_ty: local_ty + center_offset;
+                        property <float> adjusted_tx: local_tx + center_offset;
+                        property <bool> is_target_above: ty < sy;
+                        property <bool> is_target_left: tx < sx;
+                        property <float> wp_x1: local_sx + 40;
+                        property <float> wp_y1: is_target_above ? (local_ty - 30) : (adjusted_sy + ((local_ty - adjusted_sy) / 2));
+                        property <float> wp_x2: (is_target_above && is_target_left) ? (Math.max(local_sx, local_tx) + 80) : adjusted_tx;
+
+                        MoveTo {
+                            x: local_sx;
+                            y: adjusted_sy + 1;
+                        }
+
+                        LineTo {
+                            x: wp_x1;
+                            y: adjusted_sy + 1;
+                        }
+
+                        LineTo {
+                            x: wp_x1;
+                            y: wp_y1;
+                        }
+
+                        LineTo {
+                            x: wp_x2;
+                            y: wp_y1;
+                        }
+
+                        LineTo {
+                            x: wp_x2;
+                            y: local_ty;
+                        }
                     }
 
-                    LineTo {
-                        x: adjusted_sx - 1;
-                        y: is_target_above ? (local_sy + 20) : mid_y;
+                    Path {
+                        visible: (conn.from_port == "bottom" && conn.to_port == "left");
+                        width: parent.width;
+                        height: parent.height;
+                        viewbox-x: 0;
+                        viewbox-y: 0;
+                        viewbox-width: pw;
+                        viewbox-height: ph;
+                        fill: transparent;
+                        stroke: orange;
+                        stroke-width: conn.selected ? 3px : 2px;
+                        property <bool> is_forward: tx >= sx;
+                        property <float> local_sx: (sx - left + pad) - 1;
+                        property <float> local_sy: sy - top + pad;
+                        property <float> local_tx: tx - left + pad;
+                        property <float> local_ty: ty - top + pad;
+                        property <float> center_offset: -2;
+                        property <float> adjusted_sy: local_sy + center_offset;
+                        property <float> adjusted_ty: local_ty + center_offset;
+                        property <float> wp_y1: local_sy + 40;
+                        property <float> wp_x: local_tx - 40;
+
+                        MoveTo {
+                            x: local_sx + 1;
+                            y: local_sy;
+                        }
+
+                        LineTo {
+                            x: local_sx + 1;
+                            y: wp_y1;
+                        }
+
+                        LineTo {
+                            x: wp_x;
+                            y: wp_y1;
+                        }
+
+                        LineTo {
+                            x: wp_x;
+                            y: adjusted_ty + 1;
+                        }
+
+                        LineTo {
+                            x: local_tx;
+                            y: adjusted_ty + 1;
+                        }
                     }
 
-                    LineTo {
-                        x: is_target_above ? escape_x : (adjusted_tx - 1);
-                        y: is_target_above ? (local_sy + 20) : mid_y;
+                    Path {
+                        visible: (conn.from_port == "right" && conn.to_port == "left");
+                        width: parent.width;
+                        height: parent.height;
+                        viewbox-x: 0;
+                        viewbox-y: 0;
+                        viewbox-width: pw;
+                        viewbox-height: ph;
+                        fill: transparent;
+                        stroke: orange;
+                        stroke-width: conn.selected ? 3px : 2px;
+                        property <bool> is_forward: tx >= sx;
+                        property <float> local_sx: sx - left + pad;
+                        property <float> local_sy: sy - top + pad;
+                        property <float> local_tx: tx - left + pad;
+                        property <float> local_ty: ty - top + pad;
+                        property <float> center_offset: -2;
+                        property <float> adjusted_sy: local_sy + center_offset;
+                        property <float> adjusted_ty: local_ty + center_offset;
+                        property <bool> is_mixed_route: (conn.from_port == "right" || conn.from_port == "left") && (conn.to_port == "top" || conn.to_port == "bottom");
+                        property <float> wp_x1: is_mixed_route ? (local_sx + 40) : (is_forward ? (local_sx + (local_tx - local_sx) / 2) : (local_sx + 40));
+                        property <float> wp_y: is_mixed_route ? (adjusted_sy + (adjusted_ty - adjusted_sy) / 2) : (is_forward ? adjusted_ty : (adjusted_sy + (adjusted_ty - adjusted_sy) / 2));
+                        property <float> wp_x2: is_mixed_route ? local_tx : (is_forward ? (local_sx + (local_tx - local_sx) / 2) : (local_tx - 40));
+
+                        MoveTo {
+                            x: local_sx;
+                            y: adjusted_sy + 2;
+                        }
+
+                        LineTo {
+                            x: wp_x1;
+                            y: adjusted_sy + 2;
+                        }
+
+                        LineTo {
+                            x: wp_x1;
+                            y: wp_y;
+                        }
+
+                        LineTo {
+                            x: wp_x2;
+                            y: wp_y;
+                        }
+
+                        LineTo {
+                            x: wp_x2;
+                            y: adjusted_ty + 2;
+                        }
+
+                        LineTo {
+                            x: local_tx;
+                            y: adjusted_ty + 2;
+                        }
                     }
 
-                    LineTo {
-                        x: is_target_above ? escape_x : (adjusted_tx - 1);
-                        y: is_target_above ? (local_ty - 20) : local_ty;
+                    Path {
+                        visible: (conn.from_port == "bottom" && conn.to_port == "top");
+                        width: parent.width;
+                        height: parent.height;
+                        viewbox-x: 0;
+                        viewbox-y: 0;
+                        viewbox-width: pw;
+                        viewbox-height: ph;
+                        fill: transparent;
+                        stroke: orange;
+                        stroke-width: conn.selected ? 3px : 2px;
+                        property <float> local_sx: sx - left + pad;
+                        property <float> local_sy: sy - top + pad;
+                        property <float> local_tx: tx - left + pad;
+                        property <float> local_ty: ty - top + pad;
+
+                        // 1. Waypoint Y1: First drop out of the source's bottom port
+                        // If target is above: drop down 40px below source. If target is below: go halfway between elements.
+                        property <float> wp_y1: is_target_above ? (local_sy + 40) : (local_sy + (local_ty - local_sy) / 2);
+
+                        // 2. Clear Edge Offsets
+                        // Increased side_offset from 60 to 90 to push the bypass route safely out and around the node bounds.
+                        property <float> side_offset: is_target_above ? 90 : 0;
+
+                        // Increased approach padding to 30px so the horizontal step doesn't clamp close to the port.
+                        property <float> approach_offset: -30;
+
+                        MoveTo {
+                            x: local_sx;
+                            y: local_sy;
+                        }
+
+                        // Line 1: Vertically out of bottom port
+                        LineTo {
+                            x: local_sx;
+                            y: wp_y1;
+                        }
+
+                        // Line 2: Horizontally cross over to target's X position side-clearance
+                        LineTo {
+                            x: local_tx + side_offset;
+                            y: wp_y1;
+                        }
+
+                        // Line 3: Vertical track down/up to the target clearance altitude
+                        LineTo {
+                            x: local_tx + side_offset;
+                            y: local_ty + approach_offset;
+                        }
+
+                        // Line 4: Horizontal step right over the top port
+                        LineTo {
+                            x: local_tx;
+                            y: local_ty + approach_offset;
+                        }
+
+                        // Line 5: Drop straight into the target top port
+                        LineTo {
+                            x: local_tx;
+                            y: local_ty;
+                        }
                     }
 
-                    LineTo {
-                        x: adjusted_tx - 1;
-                        y: is_target_above ? (local_ty - 20) : local_ty;
-                    }
+                    if (conn.from_port == "bottom" && conn.to_port == "top"): TouchArea {
+                        property <float> local_sx: sx - left + pad;
+                        property <float> local_sy: sy - top + pad;
+                        property <float> local_tx: tx - left + pad;
+                        property <float> local_ty: ty - top + pad;
+                        property <float> side_offset: is_target_above ? 90 : 0;
+                        property <float> approach_offset: is_target_above ? -30 : 0;
+                        property <float> wp_y1: is_target_above ? (local_sy + 40) : (local_sy + (local_ty - local_sy) / 2);
 
-                    LineTo {
-                        x: adjusted_tx - 1;
-                        y: local_ty;
-                    }
-                }
+                        x: (Math.min(local_sx, is_target_above ? (local_tx + side_offset) : local_tx) - 10) * 1px;
+                        y: (Math.min(local_sy, is_target_above ? (local_ty + approach_offset) : local_ty) - 10) * 1px;
+                        width: (Math.abs((is_target_above ? (local_tx + side_offset) : local_tx) - local_sx) + 20) * 1px;
+                        height: (Math.abs((is_target_above ? (local_ty + approach_offset) : local_ty) - local_sy) + 20) * 1px;
 
-                TouchArea {
-                    width: parent.width;
-                    height: parent.height;
-                    clicked => {
-                        root.select_connection(index);
+                        clicked => {
+                            root.select_connection(index);
+                            root.selected_index = -1;
+                        }
+                    }
+                    TouchArea {
+
+                        clicked => {
+                            root.select_connection(index);
+                            root.selected_index = -1;
+                        }
                     }
                 }
             }
@@ -1349,100 +1297,80 @@ Rectangle {
     if (root.show_node_modal): Rectangle {
         width: parent.width;
         height: parent.height;
-        background: #00000088;
+        background: #00000044;
 
-        // Blocks background clicks from passing through to the node canvas below
-    TouchArea { }
+        TouchArea { }
 
         Rectangle {
-            width: 360px;
-            height: 260px; // Increased height slightly to accommodate the new input box wrappers
-        x: (parent.width - self.width) / 2;
-            y: (parent.height - self.height) / 2;
+            width: 340px;
+            height: 240px;
             background: white;
             border-radius: 8px;
             border-width: 1px;
-            border-color: #cccccc;
+            border-color: #dddddd;
 
             VerticalLayout {
-                padding: 16px;
+                padding: 20px;
                 spacing: 12px;
 
                 Text {
-                    text: "Edit Node";
-                    font-size: 20px;
+                    text: "Edit Node Properties";
+                    font-size: 16px;
                     font-weight: 700;
-                    color: #222;
+                    color: #333333;
                 }
 
-                // --- LABEL INPUT ---
-            Text {
-                    text: "Label";
-                    font-weight: 600;
-                    color: #444;
-                }
-
-                // This wrapper creates the visible text box area
-            Rectangle {
-                    background: #fcfcfc;
-                    border-width: 1px;
-                    border-color: #cccccc;
-                    border-radius: 4px;
-                    height: 32px; // Gives a clear, clickable 32px tall target area
-                
-                TextInput {
-                        text <=> root.edit_label;
-                        font-size: 14px;
-                        x: 6px; // Offsets the text slightly from the left border edge
-                    vertical-alignment: center;
-                    }
-                }
-
-                // --- VALUE INPUT ---
-            Text {
-                    text: "Value";
-                    font-weight: 600;
-                    color: #444;
-                }
-
-                // This wrapper creates the second visible text box area
-            Rectangle {
-                    background: #fcfcfc;
-                    border-width: 1px;
-                    border-color: #cccccc;
-                    border-radius: 4px;
-                    height: 32px;
-
-                    TextInput {
-                        text <=> root.edit_value;
-                        font-size: 14px;
-                        x: 6px;
-                        vertical-alignment: center;
-                    }
-                }
-
-                // Flexible empty space to push the buttons neatly to the bottom edge
-            Rectangle { }
-
-                // --- DIALOG BUTTONS ---
-            HorizontalLayout {
+                HorizontalLayout {
                     spacing: 10px;
-                    height: 36px;
+                    Text {
+                        text: "Label:";
+                        vertical-alignment: center;
+                        width: 50px;
+                    }
 
+                    value-input1 := TextInput {
+                        text: root.edit_label;
+
+                        edited => {
+                            root.edit_value = self.text;
+                        }
+                    }
+                }
+
+                HorizontalLayout {
+                    spacing: 10px;
+                    Text {
+                        text: "Value:";
+                        vertical-alignment: center;
+                        width: 50px;
+                    }
+
+                    value-input2 := TextInput {
+                        text: root.edit_value;
+                        edited => {
+                            root.edit_value = self.text;
+                        }
+                    }
+                }
+
+                Rectangle {
+                    height: 10px;
+                }
+
+                HorizontalLayout {
+                    spacing: 10px;
+                    alignment: end;
                     Button {
-                        text: "Save";
+                        text: "Cancel";
                         clicked => {
-                            root.save_node_properties(
-                            root.editing_index,
-                            root.edit_label,
-                            root.edit_value);
                             root.show_node_modal = false;
                         }
                     }
 
                     Button {
-                        text: "Close";
+                        text: "Save";
                         clicked => {
+                            root.save_node_properties(root.editing_index, root.edit_label, root.edit_value);
                             root.show_node_modal = false;
                         }
                     }
@@ -1454,9 +1382,8 @@ Rectangle {
     if (root.show_alert): Rectangle {
         width: parent.width;
         height: parent.height;
-        background: #00000044; // Tinted overlay dimming the canvas background
-        
-        // Block mouse interactions from leaking down to the node editor canvas
+        background: #00000044;
+
         TouchArea { }
 
         Rectangle {
@@ -1466,8 +1393,6 @@ Rectangle {
             border-radius: 8px;
             border-width: 1px;
             border-color: #dddddd;
-
-            // Subtle drop shadow effect using nested borders
             clip: true;
 
             VerticalLayout {
@@ -1488,7 +1413,6 @@ Rectangle {
                     wrap: word-wrap;
                 }
 
-                // Push down the close button
                 Rectangle { }
 
                 HorizontalLayout {

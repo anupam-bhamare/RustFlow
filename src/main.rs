@@ -105,33 +105,9 @@ ui.on_place_symbol(move |name, node_type, bg_color, x, y,mode| {
         });
     }
 
-    // =========================================
-    // DELETE SELECTED NODE
-    // =========================================
-    {
-        let delete_model = symbols_model.clone();
-        let ui_weak = ui.as_weak();
+   
 
-        ui.on_delete_selected_symbol(move || {
-            if let Some(ui) = ui_weak.upgrade() {
-                let index = ui.get_selected_index();
-                if index != -1 {
-                    delete_model.remove(index as usize);
-                    ui.set_selected_index(-1);
-                }
-            }
-        });
-    }
-
-    // =========================================
-    // CLEAR CANVAS
-    // =========================================
-    {
-        let clear_model = symbols_model.clone();
-        ui.on_clear_canvas(move || {
-            clear_model.set_vec(vec![]);
-        });
-    }
+   
 
     // =========================================
     // IMPORT XML
@@ -447,5 +423,76 @@ ui.on_handle_port_click({
                 ui_active.invoke_trigger_alert(message);
             }
         });
-    }   ui.run()
+    } 
+    let delete_model = symbols_model.clone();
+let ui_weak = ui.as_weak();      
+
+// Make sure your event handler uses the explicit block-cloning pattern we talked about!
+ui.on_delete_selected_symbol({
+    let connections = connections.clone();
+    let delete_model = delete_model.clone();
+
+    move || {
+        if let Some(ui) = ui_weak.upgrade() {
+            let index = ui.get_selected_index();
+            if index != -1 {
+                let target_index = index as i32; // match the i32 type of from_index/to_index
+
+                // 1. Loop BACKWARDS through connections to safely modify/remove them
+                for i in (0..connections.row_count()).rev() {
+                    if let Some(mut conn) = connections.row_data(i) {
+                        
+                        // Scenario A: Connection is attached to the deleted node -> REMOVE IT
+                        if conn.from_index == target_index || conn.to_index == target_index {
+                            connections.remove(i);
+                            println!("Removed broken connection at index {}", i);
+                        } 
+                        // Scenario B: Connection is further down the list -> SHIFT INDEX DOWN
+                        else {
+                            let mut changed = false;
+                            if conn.from_index > target_index {
+                                conn.from_index -= 1;
+                                changed = true;
+                            }
+                            if conn.to_index > target_index {
+                                conn.to_index -= 1;
+                                changed = true;
+                            }
+                            // Update the model row data if indices changed
+                            if changed {
+                                connections.set_row_data(i, conn);
+                            }
+                        }
+                    }
+                }
+
+                // 2. Safely remove the symbol itself
+                let index_usize = index as usize;
+                if index_usize < delete_model.row_count() {
+                    delete_model.remove(index_usize);
+                    println!("Deleted symbol at index {}", index_usize);
+                }
+
+                // 3. Reset selection
+                ui.set_selected_index(-1);
+            }
+        }
+    }
+    
+});
+
+ // =========================================
+    // CLEAR CANVAS
+    // =========================================
+    {
+        let clear_model = symbols_model.clone();
+        let clear_symbols = symbols_model.clone();
+        let clear_connections = connections.clone();
+        ui.on_clear_canvas(move || {
+            clear_model.set_vec(vec![]);
+                  clear_symbols.set_vec(vec![]);
+                    clear_connections.set_vec(vec![]);
+        });
+    }
+    ui.run()
 }
