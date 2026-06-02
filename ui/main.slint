@@ -1069,25 +1069,23 @@ export component AppWindow inherits Window {
                         stroke: orange;
                         stroke-width: conn.selected ? 3px : 2px;
 
-                        property <float> local_sx: sx - left + pad + 2;
+                        property <float> local_sx: sx - left + pad;
                         property <float> local_sy: sy - top + pad;
-                        property <float> local_tx: tx - left + pad + 2;
+                        property <float> local_tx: tx - left + pad;
                         property <float> local_ty: ty - top + pad;
 
                         property <float> center_offset: -2;
-
-                        property <float> adjusted_sy: local_sy + center_offset;
-                        property <float> adjusted_ty: local_ty + center_offset;
-                        property <float> adjusted_tx: local_tx + center_offset;
+                        property <float> adjusted_sy: local_sy + center_offset + 2;
 
                         property <bool> is_target_above: ty < sy;
                         property <bool> is_target_left: tx < sx;
+                        property <bool> is_straight_vertical: Math.abs(local_sx - local_tx) < 2;
 
-                        property <bool> is_straight_line: Math.abs(local_sx - local_tx) < 2;
+                        property <float> wp_x1: is_straight_vertical ? local_tx : (local_sx + 25);
 
-                        property <float> wp_x1: is_straight_line ? local_tx : (local_sx + 40);
-                        property <float> wp_y1: is_straight_line ? local_ty : (is_target_above ? (local_ty - 30) : (adjusted_sy + ((local_ty - adjusted_sy) / 2)));
-                        property <float> wp_x2: is_straight_line ? local_tx : ((is_target_above && is_target_left) ? (Math.max(local_sx, local_tx) + 80) : adjusted_tx);
+                        property <float> wp_y1: is_straight_vertical ? local_ty : (is_target_left ? (is_target_above ? (local_ty - 30) : (local_sy + 40)) : (is_target_above ? (local_ty - 30) : (adjusted_sy + (local_ty - adjusted_sy) / 2)));
+
+                        property <float> wp_x2: is_straight_vertical ? local_tx : local_tx;
 
                         MoveTo {
                             x: local_sx;
@@ -1096,7 +1094,7 @@ export component AppWindow inherits Window {
 
                         LineTo {
                             x: wp_x1;
-                            y: is_straight_line ? local_sy : adjusted_sy;
+                            y: adjusted_sy;
                         }
 
                         LineTo {
@@ -1111,7 +1109,7 @@ export component AppWindow inherits Window {
 
                         LineTo {
                             x: wp_x2;
-                            y: is_straight_line ? local_ty : local_ty;
+                            y: local_ty;
                         }
                     }
 
@@ -1284,6 +1282,35 @@ export component AppWindow inherits Window {
                         }
                     }
 
+                    if (conn.from_port == "right" && conn.to_port == "top"): TouchArea {
+                        property <float> local_sx: sx - left + pad;
+                        property <float> local_sy: sy - top + pad;
+                        property <float> local_tx: tx - left + pad;
+                        property <float> local_ty: ty - top + pad;
+
+                        property <float> center_offset: -2;
+                        property <float> adjusted_sy: local_sy + center_offset + 2;
+
+                        property <bool> is_target_above: ty < sy;
+                        property <bool> is_target_left: tx < sx;
+                        property <bool> is_straight_vertical: Math.abs(local_sx - local_tx) < 2;
+
+                        // --- MATCHES THE DRAWING PATH ROUTING EXACTLY ---
+    property <float> wp_x1: is_straight_vertical ? local_tx : (local_sx + 25);
+                        property <float> wp_y1: is_straight_vertical ? local_ty : (is_target_left ? (is_target_above ? (local_ty - 30) : (local_sy + 40)) : (is_target_above ? (local_ty - 30) : (adjusted_sy + (local_ty - adjusted_sy) / 2)));
+                        property <float> wp_x2: local_tx;
+
+                        // Dynamic bounding layout calculation for the click zone
+    x: (Math.min(local_sx, Math.min(wp_x1, wp_x2)) - 10) * 1px;
+                        y: (Math.min(adjusted_sy, Math.min(wp_y1, local_ty)) - 10) * 1px;
+                        width: (Math.max(local_sx, Math.max(wp_x1, wp_x2)) - Math.min(local_sx, Math.min(wp_x1, wp_x2)) + 20) * 1px;
+                        height: (Math.max(adjusted_sy, Math.max(wp_y1, local_ty)) - Math.min(adjusted_sy, Math.min(wp_y1, local_ty)) + 20) * 1px;
+
+                        clicked => {
+                            root.select_connection(index);
+                            root.selected_index = -1;
+                        }
+                    }
                     if (conn.from_port == "bottom" && conn.to_port == "top"): TouchArea {
                         property <float> local_sx: sx - left + pad;
                         property <float> local_sy: sy - top + pad;
