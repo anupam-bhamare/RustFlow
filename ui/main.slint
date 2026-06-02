@@ -868,7 +868,7 @@ export component AppWindow inherits Window {
                                 width: 100%;
                                 height: 100%;
                                 clicked => {
-                                    root.save_flow();
+                                    root.load_flow();
                                 }
                             }
                         }
@@ -1021,8 +1021,19 @@ export component AppWindow inherits Window {
                 }
 
                 for conn[index] in root.connections: Rectangle {
-                    property <bool> isOutputConnector: root.all_symbols[conn.from_index].name == "B";
-                    property <bool> isInputConnector: root.all_symbols[conn.to_index].name == "A";
+
+                    /*  property <string> source_name: root.all_symbols[conn.from_index].node_type;
+                    property <string> target_name: root.all_symbols[conn.to_index].node_type;
+
+                    Text {
+                        text: "Wire " + index + ": From (" + source_name + ") to (" + target_name + ")";
+                        color: #ff00ff;
+                        font-size: 11px;
+                        y: -18px; // Positions it right above the line
+                    }    */
+
+                    property <bool> isOutputConnector: root.all_symbols[conn.from_index].node_type == "op_connector";
+                    property <bool> isInputConnector: root.all_symbols[conn.to_index].node_type == "ip_connector";
                     property <float> from_hw: isOutputConnector ? 0 : 60;
                     property <float> to_hw: isInputConnector ? 60 : 60;
                     property <float> sx: (conn.from_port == "right") ? (root.all_symbols[conn.from_index].x + from_hw) : (conn.from_port == "left") ? (root.all_symbols[conn.from_index].x - from_hw) : (root.all_symbols[conn.from_index].x);
@@ -1057,28 +1068,35 @@ export component AppWindow inherits Window {
                         fill: transparent;
                         stroke: orange;
                         stroke-width: conn.selected ? 3px : 2px;
-                        property <float> local_sx: sx - left + pad;
+
+                        property <float> local_sx: sx - left + pad + 2;
                         property <float> local_sy: sy - top + pad;
-                        property <float> local_tx: tx - left + pad;
+                        property <float> local_tx: tx - left + pad + 2;
                         property <float> local_ty: ty - top + pad;
+
                         property <float> center_offset: -2;
+
                         property <float> adjusted_sy: local_sy + center_offset;
                         property <float> adjusted_ty: local_ty + center_offset;
                         property <float> adjusted_tx: local_tx + center_offset;
+
                         property <bool> is_target_above: ty < sy;
                         property <bool> is_target_left: tx < sx;
-                        property <float> wp_x1: local_sx + 40;
-                        property <float> wp_y1: is_target_above ? (local_ty - 30) : (adjusted_sy + ((local_ty - adjusted_sy) / 2));
-                        property <float> wp_x2: (is_target_above && is_target_left) ? (Math.max(local_sx, local_tx) + 80) : adjusted_tx;
+
+                        property <bool> is_straight_line: Math.abs(local_sx - local_tx) < 2;
+
+                        property <float> wp_x1: is_straight_line ? local_tx : (local_sx + 40);
+                        property <float> wp_y1: is_straight_line ? local_ty : (is_target_above ? (local_ty - 30) : (adjusted_sy + ((local_ty - adjusted_sy) / 2)));
+                        property <float> wp_x2: is_straight_line ? local_tx : ((is_target_above && is_target_left) ? (Math.max(local_sx, local_tx) + 80) : adjusted_tx);
 
                         MoveTo {
                             x: local_sx;
-                            y: adjusted_sy + 1;
+                            y: adjusted_sy;
                         }
 
                         LineTo {
                             x: wp_x1;
-                            y: adjusted_sy + 1;
+                            y: is_straight_line ? local_sy : adjusted_sy;
                         }
 
                         LineTo {
@@ -1093,7 +1111,7 @@ export component AppWindow inherits Window {
 
                         LineTo {
                             x: wp_x2;
-                            y: local_ty;
+                            y: is_straight_line ? local_ty : local_ty;
                         }
                     }
 
@@ -1109,23 +1127,26 @@ export component AppWindow inherits Window {
                         stroke: orange;
                         stroke-width: conn.selected ? 3px : 2px;
                         property <bool> is_forward: tx >= sx;
-                        property <float> local_sx: (sx - left + pad) - 1;
+                        property <float> local_sx: (sx - left + pad) + 1;
                         property <float> local_sy: sy - top + pad;
                         property <float> local_tx: tx - left + pad;
-                        property <float> local_ty: ty - top + pad;
+                        property <float> local_ty: ty - top + pad - 2;
                         property <float> center_offset: -2;
                         property <float> adjusted_sy: local_sy + center_offset;
-                        property <float> adjusted_ty: local_ty + center_offset;
-                        property <float> wp_y1: local_sy + 40;
-                        property <float> wp_x: local_tx - 40;
+                        property <float> adjusted_ty: local_ty + center_offset + 2;
+
+                        property <bool> is_straight_line: Math.abs(local_sx - local_tx) < 2;
+
+                        property <float> wp_y1: is_straight_line ? adjusted_ty : (local_sy + 40);
+                        property <float> wp_x: is_straight_line ? local_tx : (local_tx - 40);
 
                         MoveTo {
-                            x: local_sx + 1;
+                            x: local_sx;
                             y: local_sy;
                         }
 
                         LineTo {
-                            x: local_sx + 1;
+                            x: local_sx;
                             y: wp_y1;
                         }
 
@@ -1136,12 +1157,12 @@ export component AppWindow inherits Window {
 
                         LineTo {
                             x: wp_x;
-                            y: adjusted_ty + 1;
+                            y: is_straight_line ? adjusted_ty : (adjusted_ty + 1);
                         }
 
                         LineTo {
                             x: local_tx;
-                            y: adjusted_ty + 1;
+                            y: is_straight_line ? adjusted_ty : (adjusted_ty + 1);
                         }
                     }
 
@@ -1162,21 +1183,24 @@ export component AppWindow inherits Window {
                         property <float> local_tx: tx - left + pad;
                         property <float> local_ty: ty - top + pad;
                         property <float> center_offset: -2;
-                        property <float> adjusted_sy: local_sy + center_offset;
-                        property <float> adjusted_ty: local_ty + center_offset;
+                        property <float> adjusted_sy: local_sy + center_offset + 2;
+                        property <float> adjusted_ty: local_ty + center_offset + 2;
                         property <bool> is_mixed_route: (conn.from_port == "right" || conn.from_port == "left") && (conn.to_port == "top" || conn.to_port == "bottom");
+
+                        property <bool> is_straight_line: Math.abs(adjusted_sy - adjusted_ty) < 2;
+
                         property <float> wp_x1: is_mixed_route ? (local_sx + 40) : (is_forward ? (local_sx + (local_tx - local_sx) / 2) : (local_sx + 40));
-                        property <float> wp_y: is_mixed_route ? (adjusted_sy + (adjusted_ty - adjusted_sy) / 2) : (is_forward ? adjusted_ty : (adjusted_sy + (adjusted_ty - adjusted_sy) / 2));
+                        property <float> wp_y: is_straight_line ? adjusted_sy : (is_mixed_route ? (adjusted_sy + (adjusted_ty - adjusted_sy) / 2) : (is_forward ? adjusted_ty : (adjusted_sy + (adjusted_ty - adjusted_sy) / 2)));
                         property <float> wp_x2: is_mixed_route ? local_tx : (is_forward ? (local_sx + (local_tx - local_sx) / 2) : (local_tx - 40));
 
                         MoveTo {
                             x: local_sx;
-                            y: adjusted_sy + 2;
+                            y: adjusted_sy;
                         }
 
                         LineTo {
                             x: wp_x1;
-                            y: adjusted_sy + 2;
+                            y: is_straight_line ? adjusted_sy : adjusted_sy;
                         }
 
                         LineTo {
@@ -1191,12 +1215,12 @@ export component AppWindow inherits Window {
 
                         LineTo {
                             x: wp_x2;
-                            y: adjusted_ty + 2;
+                            y: is_straight_line ? adjusted_sy : adjusted_ty;
                         }
 
                         LineTo {
                             x: local_tx;
-                            y: adjusted_ty + 2;
+                            y: is_straight_line ? adjusted_sy : adjusted_ty;
                         }
                     }
 
@@ -1211,55 +1235,52 @@ export component AppWindow inherits Window {
                         fill: transparent;
                         stroke: orange;
                         stroke-width: conn.selected ? 3px : 2px;
+
                         property <float> local_sx: sx - left + pad;
                         property <float> local_sy: sy - top + pad;
                         property <float> local_tx: tx - left + pad;
                         property <float> local_ty: ty - top + pad;
 
-                        // 1. Waypoint Y1: First drop out of the source's bottom port
-                        // If target is above: drop down 40px below source. If target is below: go halfway between elements.
-                        property <float> wp_y1: is_target_above ? (local_sy + 40) : (local_sy + (local_ty - local_sy) / 2);
+                        property <float> adjusted_sx: local_sx;
+                        property <float> adjusted_tx: local_tx;
 
-                        // 2. Clear Edge Offsets
-                        // Increased side_offset from 60 to 90 to push the bypass route safely out and around the node bounds.
-                        property <float> side_offset: is_target_above ? 90 : 0;
+                        property <float> adjusted_ty: local_ty;
 
-                        // Increased approach padding to 30px so the horizontal step doesn't clamp close to the port.
-                        property <float> approach_offset: -30;
+                        property <bool> is_straight_vertical: Math.abs(adjusted_sx - adjusted_tx) < 2;
+                        property <bool> is_target_above: ty < sy;
+
+                        property <float> wp_y1: is_straight_vertical ? adjusted_ty : (is_target_above ? (local_sy + 40) : (local_sy + (adjusted_ty - local_sy) / 2));
+                        property <float> side_offset: (is_straight_vertical || !is_target_above) ? 0 : 90;
+                        property <float> approach_offset: (is_straight_vertical || !is_target_above) ? 0 : -30;
 
                         MoveTo {
-                            x: local_sx;
+                            x: adjusted_sx;
                             y: local_sy;
                         }
 
-                        // Line 1: Vertically out of bottom port
                         LineTo {
-                            x: local_sx;
+                            x: adjusted_sx;
                             y: wp_y1;
                         }
 
-                        // Line 2: Horizontally cross over to target's X position side-clearance
                         LineTo {
-                            x: local_tx + side_offset;
+                            x: is_straight_vertical ? adjusted_tx : (adjusted_tx + side_offset);
                             y: wp_y1;
                         }
 
-                        // Line 3: Vertical track down/up to the target clearance altitude
                         LineTo {
-                            x: local_tx + side_offset;
-                            y: local_ty + approach_offset;
+                            x: is_straight_vertical ? adjusted_tx : (adjusted_tx + side_offset);
+                            y: is_straight_vertical ? adjusted_ty : (adjusted_ty + approach_offset);
                         }
 
-                        // Line 4: Horizontal step right over the top port
                         LineTo {
-                            x: local_tx;
-                            y: local_ty + approach_offset;
+                            x: adjusted_tx;
+                            y: is_straight_vertical ? adjusted_ty : (adjusted_ty + approach_offset);
                         }
 
-                        // Line 5: Drop straight into the target top port
                         LineTo {
-                            x: local_tx;
-                            y: local_ty;
+                            x: adjusted_tx;
+                            y: adjusted_ty;
                         }
                     }
 
@@ -1268,21 +1289,25 @@ export component AppWindow inherits Window {
                         property <float> local_sy: sy - top + pad;
                         property <float> local_tx: tx - left + pad;
                         property <float> local_ty: ty - top + pad;
-                        property <float> side_offset: is_target_above ? 90 : 0;
-                        property <float> approach_offset: is_target_above ? -30 : 0;
-                        property <float> wp_y1: is_target_above ? (local_sy + 40) : (local_sy + (local_ty - local_sy) / 2);
 
-                        x: (Math.min(local_sx, is_target_above ? (local_tx + side_offset) : local_tx) - 10) * 1px;
-                        y: (Math.min(local_sy, is_target_above ? (local_ty + approach_offset) : local_ty) - 10) * 1px;
-                        width: (Math.abs((is_target_above ? (local_tx + side_offset) : local_tx) - local_sx) + 20) * 1px;
-                        height: (Math.abs((is_target_above ? (local_ty + approach_offset) : local_ty) - local_sy) + 20) * 1px;
+                        // Perfect vertical port centering alignment corrections
+    property <float> adjusted_sx: local_sx + 1;
+                        property <float> adjusted_tx: local_tx + 1;
+                        property <float> adjusted_ty: local_ty;
 
-                        clicked => {
-                            root.select_connection(index);
-                            root.selected_index = -1;
-                        }
-                    }
-                    TouchArea {
+                        // Correct vertical routing check (compares horizontal X-coordinates)
+    property <bool> is_straight_vertical: Math.abs(adjusted_sx - adjusted_tx) < 2;
+                        property <bool> is_target_above: ty < sy;
+
+                        property <float> side_offset: (is_straight_vertical || !is_target_above) ? 0 : 90;
+                        property <float> approach_offset: (is_straight_vertical || !is_target_above) ? 0 : -30;
+                        property <float> wp_y1: is_straight_vertical ? adjusted_ty : (is_target_above ? (local_sy + 40) : (local_sy + (adjusted_ty - local_sy) / 2));
+
+                        // Bounding hit-box calculations matching the clean path flow
+    x: (Math.min(adjusted_sx, is_straight_vertical ? adjusted_tx : (adjusted_tx + side_offset)) - 10) * 1px;
+                        y: (Math.min(local_sy, adjusted_ty) - 10) * 1px;
+                        width: (is_straight_vertical ? 20 : (Math.abs((adjusted_tx + side_offset) - adjusted_sx) + 20)) * 1px;
+                        height: (Math.abs(adjusted_ty - local_sy) + 20) * 1px;
 
                         clicked => {
                             root.select_connection(index);
@@ -1299,69 +1324,113 @@ export component AppWindow inherits Window {
         height: parent.height;
         background: #00000044;
 
-        TouchArea { }
+        TouchArea { /* Blocks clicks from hitting the canvas underneath */ }
 
-        Rectangle {
-            width: 340px;
+        // Centered modal layout frame
+    Rectangle {
+            width: 360px;
             height: 240px;
             background: white;
             border-radius: 8px;
             border-width: 1px;
-            border-color: #dddddd;
+            border-color: #e0e0e0;
+        // Drop a subtle drop-shadow effect if supported by your backend container, or leave clip for crisp edges:
+        clip: true;
 
             VerticalLayout {
-                padding: 20px;
-                spacing: 12px;
+                padding: 24px;
+                spacing: 16px;
 
                 Text {
                     text: "Edit Node Properties";
                     font-size: 16px;
                     font-weight: 700;
-                    color: #333333;
+                    color: #222222;
                 }
 
-                HorizontalLayout {
-                    spacing: 10px;
+                // --- Form Input 1: Label ---
+            HorizontalLayout {
+                    spacing: 16px;
                     Text {
                         text: "Label:";
                         vertical-alignment: center;
+                        font-size: 13px;
+                        font-weight: 500;
+                        color: #555555;
                         width: 50px;
                     }
 
-                    value-input1 := TextInput {
-                        text: root.edit_label;
+                    // Visual container wrapper for TextInput
+                Rectangle {
+                        background: #f8f9fa;
+                        border-radius: 4px;
+                        border-width: 1px;
+                        border-color: #cccccc;
+                        height: 32px;
 
-                        edited => {
-                            root.edit_value = self.text;
+                        TextInput {
+                            text: root.edit_label;
+                            font-size: 13px;
+                            vertical-alignment: center;
+                            single-line: true;
+                        // Use local element constraints or custom padding adjustments
+                        x: 8px;
+                            width: parent.width - 16px;
+
+                            edited => {
+                                root.edit_label = self.text;
+                            }
                         }
                     }
                 }
 
-                HorizontalLayout {
-                    spacing: 10px;
+                // --- Form Input 2: Value ---
+            HorizontalLayout {
+                    spacing: 16px;
                     Text {
                         text: "Value:";
                         vertical-alignment: center;
+                        font-size: 13px;
+                        font-weight: 500;
+                        color: #555555;
                         width: 50px;
                     }
 
-                    value-input2 := TextInput {
-                        text: root.edit_value;
-                        edited => {
-                            root.edit_value = self.text;
+                    // Visual container wrapper for TextInput
+                Rectangle {
+                        background: #f8f9fa;
+                        border-radius: 4px;
+                        border-width: 1px;
+                        border-color: #cccccc;
+                        height: 32px;
+
+                        TextInput {
+                            text: root.edit_value;
+                            font-size: 13px;
+                            vertical-alignment: center;
+                            single-line: true;
+                            x: 8px;
+                            width: parent.width - 16px;
+
+                            edited => {
+                                root.edit_value = self.text;
+                            }
                         }
                     }
                 }
 
-                Rectangle {
-                    height: 10px;
-                }
+                // Dynamic layout spacer to push actions safely down
+            Rectangle { }
 
-                HorizontalLayout {
-                    spacing: 10px;
+                // --- Modal Actions ---
+            HorizontalLayout {
+                    spacing: 12px;
                     alignment: end;
+
                     Button {
-                        text: "Cancel";
+                        width: 85px;
+                        height: 32px;
+                        primary: true;
                         clicked => {
                             root.show_node_modal = false;
                         }
@@ -1369,6 +1438,9 @@ export component AppWindow inherits Window {
 
                     Button {
                         text: "Save";
+                        width: 85px;
+                        height: 32px;
+                        primary: true;
                         clicked => {
                             root.save_node_properties(root.editing_index, root.edit_label, root.edit_value);
                             root.show_node_modal = false;
@@ -1384,20 +1456,20 @@ export component AppWindow inherits Window {
         height: parent.height;
         background: #00000044;
 
-        TouchArea { }
+        TouchArea { /* Blocks clicks from hitting the canvas underneath */ }
 
         Rectangle {
             width: 320px;
-            height: 160px;
-            background: white;
+            height: 180px; // Slightly increased to fit padding nicely
+        background: white;
             border-radius: 8px;
             border-width: 1px;
             border-color: #dddddd;
             clip: true;
 
             VerticalLayout {
-                padding: 20px;
-                spacing: 15px;
+                padding: 16px;
+                spacing: 12px;
 
                 Text {
                     text: "Notification";
@@ -1406,22 +1478,27 @@ export component AppWindow inherits Window {
                     color: #333333;
                 }
 
-                Text {
+                // Let the message text expand to fill the middle space
+            Text {
                     text: root.alert_message;
-                    font-size: 13px;
+                    font-size: 14px;
                     color: #555555;
                     wrap: word-wrap;
+                    vertical-alignment: top;
                 }
 
-                Rectangle { }
-
-                HorizontalLayout {
-                    alignment: end;
-                    Button {
-                        text: "OK";
-                        width: 70px;
-                        height: 30px;
-                        clicked => {
+                // Horizontal layout forces the button to respect its own width 
+            // instead of stretching across the entire dialog width
+            HorizontalLayout {
+                    alignment: center; // Centers the button horizontally
+                
+                Button {
+                        text: "Ok";
+                        width: 100px;  // Using a fixed size looks much cleaner on small dialogs
+                    height: 36px;
+                        primary: true; // Standard Slint way to make it pop (or style manually)
+                    
+                    clicked => {
                             root.show_alert = false;
                         }
                     }

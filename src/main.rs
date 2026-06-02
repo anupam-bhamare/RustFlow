@@ -254,6 +254,15 @@ ui.on_handle_port_click({
         let export_connections_active = connections.clone();
 
         ui.on_save_flow(move || {
+            if export_symbols_active.row_count() == 0 {
+            if let Some(ui_active) = ui_save_weak.upgrade() {
+                let message = slint::SharedString::from(
+                    "There is no flow configuration to save."
+                );
+                ui_active.invoke_trigger_alert(message);
+            }
+            return; // Exit early so no empty file is created
+        }
             let mut json_nodes = Vec::new();
 
             // 2. Map Slint Nodes from your active shared Vector Model
@@ -417,7 +426,7 @@ ui.on_handle_port_click({
             if let Some(ui_active) = ui_load_weak.upgrade() {
                 let filename = path.file_name().unwrap_or_default().to_string_lossy();
                 let message = slint::SharedString::from(format!(
-                    "Flow composition parsed perfectly!\nLoaded File: {}", 
+                    "Flow composition parsed successfully!\nLoaded File: {}", 
                     filename
                 ));
                 ui_active.invoke_trigger_alert(message);
