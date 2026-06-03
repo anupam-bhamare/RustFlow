@@ -993,7 +993,10 @@ export component AppWindow inherits Window {
                         label: item.label == "" ? item.name : item.label;
                         creation_mode: item.creation_mode;
                         port_clicked(is_input, port_name) => {
-                            root.handle_port_click(i, is_input, item.creation_mode, port_name);
+                            let final_is_input = (!is_input && (port_name == "left" || port_name == "top")) ? true : is-input;
+                            debug("Port Clicked - Name:", port_name, "| Is Input:", final_is_input);
+
+                            root.handle_port_click(i, final_is_input, item.creation_mode, port_name);
                         }
                     }
 
@@ -1057,18 +1060,7 @@ export component AppWindow inherits Window {
                     background: transparent;
                     z: 1;
 
-                    Path {
-                        visible: (conn.from_port == "right" && conn.to_port == "top");
-                        width: parent.width;
-                        height: parent.height;
-                        viewbox-x: 0;
-                        viewbox-y: 0;
-                        viewbox-width: pw;
-                        viewbox-height: ph;
-                        fill: transparent;
-                        stroke: orange;
-                        stroke-width: conn.selected ? 3px : 2px;
-
+                    Rectangle {
                         property <float> local_sx: sx - left + pad;
                         property <float> local_sy: sy - top + pad;
                         property <float> local_tx: tx - left + pad;
@@ -1085,45 +1077,110 @@ export component AppWindow inherits Window {
 
                         property <float> wp_y1: is_straight_vertical ? local_ty : (is_target_left ? (is_target_above ? (local_ty - 30) : (local_sy + 40)) : (is_target_above ? (local_ty - 30) : (adjusted_sy + (local_ty - adjusted_sy) / 2)));
 
-                        property <float> wp_x2: is_straight_vertical ? local_tx : local_tx;
+                        property <float> wp_x2: local_tx - 1;
+                        property <float> thick: 16.0;
 
-                        MoveTo {
-                            x: local_sx;
-                            y: adjusted_sy;
+                        Path {
+                            visible: (conn.from_port == "right" && conn.to_port == "top");
+                            width: parent.width;
+                            height: parent.height;
+                            viewbox-x: 0;
+                            viewbox-y: 0;
+                            viewbox-width: pw;
+                            viewbox-height: ph;
+                            fill: transparent;
+                            stroke: orange;
+                            stroke-width: conn.selected ? 3px : 2px;
+
+                            MoveTo {
+                                x: local_sx;
+                                y: adjusted_sy;
+                            }
+
+                            LineTo {
+                                x: wp_x1;
+                                y: adjusted_sy;
+                            }
+
+                            LineTo {
+                                x: wp_x1;
+                                y: wp_y1;
+                            }
+
+                            LineTo {
+                                x: wp_x2;
+                                y: wp_y1;
+                            }
+
+                            LineTo {
+                                x: wp_x2;
+                                y: local_ty;
+                            }
                         }
 
-                        LineTo {
-                            x: wp_x1;
-                            y: adjusted_sy;
-                        }
+                        if (conn.from_port == "right" && conn.to_port == "top"): Rectangle {
+                            background: transparent;
 
-                        LineTo {
-                            x: wp_x1;
-                            y: wp_y1;
-                        }
+                            Rectangle {
+                                x: Math.min(local_sx, wp_x1) * 1px;
+                                y: adjusted_sy * 1px - (thick / 2) * 1px;
+                                width: (Math.abs(wp_x1 - local_sx) + 1.0) * 1px;
+                                height: thick * 1px;
+                                background: transparent;
+                                TouchArea {
+                                    clicked => {
+                                        root.select_connection(index);
+                                        root.selected_index = -1;
+                                    }
+                                }
+                            }
 
-                        LineTo {
-                            x: wp_x2;
-                            y: wp_y1;
-                        }
+                            Rectangle {
+                                x: wp_x1 * 1px - (thick / 2) * 1px;
+                                y: Math.min(adjusted_sy, wp_y1) * 1px;
+                                width: thick * 1px;
+                                height: (Math.abs(wp_y1 - adjusted_sy) + 1.0) * 1px;
+                                background: transparent;
+                                TouchArea {
+                                    clicked => {
+                                        root.select_connection(index);
+                                        root.selected_index = -1;
+                                    }
+                                }
+                            }
 
-                        LineTo {
-                            x: wp_x2;
-                            y: local_ty;
+                            Rectangle {
+                                x: Math.min(wp_x1, wp_x2) * 1px;
+                                y: wp_y1 * 1px - (thick / 2) * 1px;
+                                width: (Math.abs(wp_x2 - wp_x1) + 1.0) * 1px;
+                                height: thick * 1px;
+                                background: transparent;
+                                TouchArea {
+                                    clicked => {
+                                        root.select_connection(index);
+                                        root.selected_index = -1;
+                                    }
+                                }
+                            }
+
+                            Rectangle {
+                                x: wp_x2 * 1px - (thick / 2) * 1px;
+                                y: Math.min(wp_y1, local_ty) * 1px;
+                                width: thick * 1px;
+                                height: (Math.abs(local_ty - wp_y1) + 1.0) * 1px;
+                                background: transparent;
+                                TouchArea {
+                                    clicked => {
+                                        root.select_connection(index);
+                                        root.selected_index = -1;
+                                    }
+                                }
+                            }
                         }
                     }
 
-                    Path {
-                        visible: (conn.from_port == "bottom" && conn.to_port == "left");
-                        width: parent.width;
-                        height: parent.height;
-                        viewbox-x: 0;
-                        viewbox-y: 0;
-                        viewbox-width: pw;
-                        viewbox-height: ph;
-                        fill: transparent;
-                        stroke: orange;
-                        stroke-width: conn.selected ? 3px : 2px;
+                    Rectangle {
+
                         property <bool> is_forward: tx >= sx;
                         property <float> local_sx: (sx - left + pad) + 1;
                         property <float> local_sy: sy - top + pad;
@@ -1137,44 +1194,111 @@ export component AppWindow inherits Window {
 
                         property <float> wp_y1: is_straight_line ? adjusted_ty : (local_sy + 40);
                         property <float> wp_x: is_straight_line ? local_tx : (local_tx - 40);
+                        property <float> target_y: is_straight_line ? adjusted_ty : (adjusted_ty + 1);
 
-                        MoveTo {
-                            x: local_sx;
-                            y: local_sy;
+                        property <float> thick: 16.0;
+
+                        Path {
+                            visible: (conn.from_port == "bottom" && conn.to_port == "left");
+                            width: parent.width;
+                            height: parent.height;
+                            viewbox-x: 0;
+                            viewbox-y: 0;
+                            viewbox-width: pw;
+                            viewbox-height: ph;
+                            fill: transparent;
+                            stroke: orange;
+                            stroke-width: conn.selected ? 3px : 2px;
+
+                            MoveTo {
+                                x: local_sx;
+                                y: local_sy;
+                            }
+
+                            LineTo {
+                                x: local_sx;
+                                y: wp_y1;
+                            }
+
+                            LineTo {
+                                x: wp_x;
+                                y: wp_y1;
+                            }
+
+                            LineTo {
+                                x: wp_x;
+                                y: is_straight_line ? adjusted_ty : (adjusted_ty + 1);
+                            }
+
+                            LineTo {
+                                x: local_tx;
+                                y: is_straight_line ? adjusted_ty : (adjusted_ty + 1);
+                            }
                         }
 
-                        LineTo {
-                            x: local_sx;
-                            y: wp_y1;
-                        }
+                        if (conn.from_port == "bottom" && conn.to_port == "left"): Rectangle {
+                            background: transparent;
 
-                        LineTo {
-                            x: wp_x;
-                            y: wp_y1;
-                        }
+                            Rectangle {
+                                x: local_sx * 1px - (thick / 2) * 1px;
+                                y: Math.min(local_sy, wp_y1) * 1px;
+                                width: thick * 1px;
+                                height: (Math.abs(wp_y1 - local_sy) + 1.0) * 1px;
+                                background: transparent;
+                                TouchArea {
+                                    clicked => {
+                                        root.select_connection(index);
+                                        root.selected_index = -1;
+                                    }
+                                }
+                            }
 
-                        LineTo {
-                            x: wp_x;
-                            y: is_straight_line ? adjusted_ty : (adjusted_ty + 1);
-                        }
+                            Rectangle {
+                                x: Math.min(local_sx, wp_x) * 1px;
+                                y: wp_y1 * 1px - (thick / 2) * 1px;
+                                width: (Math.abs(wp_x - local_sx) + 1.0) * 1px;
+                                height: thick * 1px;
+                                background: transparent;
+                                TouchArea {
+                                    clicked => {
+                                        root.select_connection(index);
+                                        root.selected_index = -1;
+                                    }
+                                }
+                            }
 
-                        LineTo {
-                            x: local_tx;
-                            y: is_straight_line ? adjusted_ty : (adjusted_ty + 1);
+                            Rectangle {
+                                x: wp_x * 1px - (thick / 2) * 1px;
+                                y: Math.min(wp_y1, target_y) * 1px;
+                                width: thick * 1px;
+                                height: (Math.abs(target_y - wp_y1) + 1.0) * 1px;
+                                background: transparent;
+                                TouchArea {
+                                    clicked => {
+                                        root.select_connection(index);
+                                        root.selected_index = -1;
+                                    }
+                                }
+                            }
+
+                            Rectangle {
+                                x: Math.min(wp_x, local_tx) * 1px;
+                                y: target_y * 1px - (thick / 2) * 1px;
+                                width: (Math.abs(local_tx - wp_x) + 1.0) * 1px;
+                                height: thick * 1px;
+                                background: transparent;
+                                TouchArea {
+                                    clicked => {
+                                        root.select_connection(index);
+                                        root.selected_index = -1;
+                                    }
+                                }
+                            }
                         }
                     }
 
-                    Path {
-                        visible: (conn.from_port == "right" && conn.to_port == "left");
-                        width: parent.width;
-                        height: parent.height;
-                        viewbox-x: 0;
-                        viewbox-y: 0;
-                        viewbox-width: pw;
-                        viewbox-height: ph;
-                        fill: transparent;
-                        stroke: orange;
-                        stroke-width: conn.selected ? 3px : 2px;
+                    Rectangle {
+
                         property <bool> is_forward: tx >= sx;
                         property <float> local_sx: sx - left + pad;
                         property <float> local_sy: sy - top + pad;
@@ -1184,55 +1308,130 @@ export component AppWindow inherits Window {
                         property <float> adjusted_sy: local_sy + center_offset + 2;
                         property <float> adjusted_ty: local_ty + center_offset + 2;
                         property <bool> is_mixed_route: (conn.from_port == "right" || conn.from_port == "left") && (conn.to_port == "top" || conn.to_port == "bottom");
-
                         property <bool> is_straight_line: Math.abs(adjusted_sy - adjusted_ty) < 2;
 
                         property <float> wp_x1: is_mixed_route ? (local_sx + 40) : (is_forward ? (local_sx + (local_tx - local_sx) / 2) : (local_sx + 40));
                         property <float> wp_y: is_straight_line ? adjusted_sy : (is_mixed_route ? (adjusted_sy + (adjusted_ty - adjusted_sy) / 2) : (is_forward ? adjusted_ty : (adjusted_sy + (adjusted_ty - adjusted_sy) / 2)));
                         property <float> wp_x2: is_mixed_route ? local_tx : (is_forward ? (local_sx + (local_tx - local_sx) / 2) : (local_tx - 40));
 
-                        MoveTo {
-                            x: local_sx;
-                            y: adjusted_sy;
+                        property <float> thick: 16.0;
+                        property <float> seg45_y: is_straight_line ? adjusted_sy : adjusted_ty;
+
+                        Path {
+                            visible: (conn.from_port == "right" && conn.to_port == "left");
+                            width: parent.width;
+                            height: parent.height;
+                            viewbox-x: 0;
+                            viewbox-y: 0;
+                            viewbox-width: pw;
+                            viewbox-height: ph;
+                            fill: transparent;
+                            stroke: orange;
+                            stroke-width: conn.selected ? 3px : 2px;
+
+                            MoveTo {
+                                x: local_sx;
+                                y: adjusted_sy;
+                            }
+
+                            LineTo {
+                                x: wp_x1;
+                                y: adjusted_sy;
+                            }
+
+                            LineTo {
+                                x: wp_x1;
+                                y: wp_y;
+                            }
+
+                            LineTo {
+                                x: wp_x2;
+                                y: wp_y;
+                            }
+
+                            LineTo {
+                                x: wp_x2;
+                                y: is_straight_line ? adjusted_sy : adjusted_ty;
+                            }
+
+                            LineTo {
+                                x: local_tx;
+                                y: is_straight_line ? adjusted_sy : adjusted_ty;
+                            }
                         }
 
-                        LineTo {
-                            x: wp_x1;
-                            y: is_straight_line ? adjusted_sy : adjusted_sy;
+                        Rectangle {
+                            x: Math.min(local_sx, wp_x1) * 1px;
+                            y: adjusted_sy * 1px - (thick / 2) * 1px;
+                            width: (Math.abs(wp_x1 - local_sx) + 1.0) * 1px;
+                            height: thick * 1px;
+                            background: transparent;
+                            TouchArea {
+                                clicked => {
+                                    root.select_connection(index);
+                                    root.selected_index = -1;
+                                }
+                            }
                         }
 
-                        LineTo {
-                            x: wp_x1;
-                            y: wp_y;
+                        Rectangle {
+                            x: wp_x1 * 1px - (thick / 2) * 1px;
+                            y: Math.min(adjusted_sy, wp_y) * 1px;
+                            width: thick * 1px;
+                            height: (Math.abs(wp_y - adjusted_sy) + 1.0) * 1px;
+                            background: transparent;
+                            TouchArea {
+                                clicked => {
+                                    root.select_connection(index);
+                                    root.selected_index = -1;
+                                }
+                            }
                         }
 
-                        LineTo {
-                            x: wp_x2;
-                            y: wp_y;
+                        Rectangle {
+                            x: Math.min(wp_x1, wp_x2) * 1px;
+                            y: wp_y * 1px - (thick / 2) * 1px;
+                            width: (Math.abs(wp_x2 - wp_x1) + 1.0) * 1px;
+                            height: thick * 1px;
+                            background: transparent;
+                            TouchArea {
+                                clicked => {
+                                    root.select_connection(index);
+                                    root.selected_index = -1;
+                                }
+                            }
                         }
 
-                        LineTo {
-                            x: wp_x2;
-                            y: is_straight_line ? adjusted_sy : adjusted_ty;
+                        Rectangle {
+                            x: wp_x2 * 1px - (thick / 2) * 1px;
+                            y: Math.min(wp_y, seg45_y) * 1px;
+                            width: thick * 1px;
+                            height: (Math.abs(seg45_y - wp_y) + 1.0) * 1px;
+                            background: transparent;
+                            TouchArea {
+                                clicked => {
+                                    root.select_connection(index);
+                                    root.selected_index = -1;
+                                }
+                            }
                         }
 
-                        LineTo {
-                            x: local_tx;
-                            y: is_straight_line ? adjusted_sy : adjusted_ty;
+                        Rectangle {
+                            x: Math.min(wp_x2, local_tx) * 1px;
+                            y: seg45_y * 1px - (thick / 2) * 1px;
+                            width: (Math.abs(local_tx - wp_x2) + 1.0) * 1px;
+                            height: thick * 1px;
+                            background: transparent;
+                            TouchArea {
+                                clicked => {
+                                    root.select_connection(index);
+                                    root.selected_index = -1;
+                                }
+                            }
                         }
                     }
 
-                    Path {
-                        visible: (conn.from_port == "bottom" && conn.to_port == "top");
-                        width: parent.width;
-                        height: parent.height;
-                        viewbox-x: 0;
-                        viewbox-y: 0;
-                        viewbox-width: pw;
-                        viewbox-height: ph;
-                        fill: transparent;
-                        stroke: orange;
-                        stroke-width: conn.selected ? 3px : 2px;
+                    Rectangle {
 
                         property <float> local_sx: sx - left + pad;
                         property <float> local_sy: sy - top + pad;
@@ -1241,7 +1440,6 @@ export component AppWindow inherits Window {
 
                         property <float> adjusted_sx: local_sx;
                         property <float> adjusted_tx: local_tx;
-
                         property <float> adjusted_ty: local_ty;
 
                         property <bool> is_straight_vertical: Math.abs(adjusted_sx - adjusted_tx) < 2;
@@ -1251,94 +1449,213 @@ export component AppWindow inherits Window {
                         property <float> side_offset: (is_straight_vertical || !is_target_above) ? 0 : 90;
                         property <float> approach_offset: (is_straight_vertical || !is_target_above) ? 0 : -30;
 
-                        MoveTo {
-                            x: adjusted_sx;
-                            y: local_sy;
+                        property <float> seg23_x: is_straight_vertical ? adjusted_tx : (adjusted_tx + side_offset);
+                        property <float> seg34_y: is_straight_vertical ? adjusted_ty : (adjusted_ty + approach_offset);
+                        property <float> thick: 16.0;
+
+                        Path {
+                            visible: (conn.from_port == "bottom" && conn.to_port == "top");
+                            width: parent.width;
+                            height: parent.height;
+                            viewbox-x: 0;
+                            viewbox-y: 0;
+                            viewbox-width: pw;
+                            viewbox-height: ph;
+                            fill: transparent;
+                            stroke: orange;
+                            stroke-width: conn.selected ? 3px : 2px;
+
+                            MoveTo {
+                                x: adjusted_sx;
+                                y: local_sy;
+                            }
+
+                            LineTo {
+                                x: adjusted_sx;
+                                y: wp_y1;
+                            }
+
+                            LineTo {
+                                x: seg23_x;
+                                y: wp_y1;
+                            }
+
+                            LineTo {
+                                x: seg23_x;
+                                y: seg34_y;
+                            }
+
+                            LineTo {
+                                x: adjusted_tx;
+                                y: seg34_y;
+                            }
+
+                            LineTo {
+                                x: adjusted_tx;
+                                y: adjusted_ty;
+                            }
                         }
 
-                        LineTo {
-                            x: adjusted_sx;
-                            y: wp_y1;
+                        Rectangle {
+                            x: adjusted_sx * 1px - (thick / 2) * 1px;
+                            y: Math.min(local_sy, wp_y1) * 1px;
+                            width: thick * 1px;
+                            height: (Math.abs(wp_y1 - local_sy) + 1.0) * 1px;
+                            background: transparent;
+                            TouchArea {
+                                clicked => {
+                                    root.select_connection(index);
+                                    root.selected_index = -1;
+                                }
+                            }
                         }
 
-                        LineTo {
-                            x: is_straight_vertical ? adjusted_tx : (adjusted_tx + side_offset);
-                            y: wp_y1;
+                        Rectangle {
+                            x: Math.min(adjusted_sx, seg23_x) * 1px;
+                            y: wp_y1 * 1px - (thick / 2) * 1px;
+                            width: (Math.abs(seg23_x - adjusted_sx) + 1.0) * 1px;
+                            height: thick * 1px;
+                            background: transparent;
+                            TouchArea {
+                                clicked => {
+                                    root.select_connection(index);
+                                    root.selected_index = -1;
+                                }
+                            }
                         }
 
-                        LineTo {
-                            x: is_straight_vertical ? adjusted_tx : (adjusted_tx + side_offset);
-                            y: is_straight_vertical ? adjusted_ty : (adjusted_ty + approach_offset);
+                        Rectangle {
+                            x: seg23_x * 1px - (thick / 2) * 1px;
+                            y: Math.min(wp_y1, seg34_y) * 1px;
+                            width: thick * 1px;
+                            height: (Math.abs(seg34_y - wp_y1) + 1.0) * 1px;
+                            background: transparent;
+                            TouchArea {
+                                clicked => {
+                                    root.select_connection(index);
+                                    root.selected_index = -1;
+                                }
+                            }
                         }
 
-                        LineTo {
-                            x: adjusted_tx;
-                            y: is_straight_vertical ? adjusted_ty : (adjusted_ty + approach_offset);
+                        Rectangle {
+                            x: Math.min(seg23_x, adjusted_tx) * 1px;
+                            y: seg34_y * 1px - (thick / 2) * 1px;
+                            width: (Math.abs(adjusted_tx - seg23_x) + 1.0) * 1px;
+                            height: thick * 1px;
+                            background: transparent;
+                            TouchArea {
+                                clicked => {
+                                    root.select_connection(index);
+                                    root.selected_index = -1;
+                                }
+                            }
                         }
 
-                        LineTo {
-                            x: adjusted_tx;
-                            y: adjusted_ty;
+                        Rectangle {
+                            x: adjusted_tx * 1px - (thick / 2) * 1px;
+                            y: Math.min(seg34_y, adjusted_ty) * 1px;
+                            width: thick * 1px;
+                            height: (Math.abs(adjusted_ty - seg34_y) + 1.0) * 1px;
+                            background: transparent;
+                            TouchArea {
+                                clicked => {
+                                    root.select_connection(index);
+                                    root.selected_index = -1;
+                                }
+                            }
                         }
                     }
 
-                    if (conn.from_port == "right" && conn.to_port == "top"): TouchArea {
+                    Rectangle {
+
                         property <float> local_sx: sx - left + pad;
                         property <float> local_sy: sy - top + pad;
                         property <float> local_tx: tx - left + pad;
                         property <float> local_ty: ty - top + pad;
 
-                        property <float> center_offset: -2;
-                        property <float> adjusted_sy: local_sy + center_offset + 2;
-
-                        property <bool> is_target_above: ty < sy;
-                        property <bool> is_target_left: tx < sx;
                         property <bool> is_straight_vertical: Math.abs(local_sx - local_tx) < 2;
 
-                        // --- MATCHES THE DRAWING PATH ROUTING EXACTLY ---
-    property <float> wp_x1: is_straight_vertical ? local_tx : (local_sx + 25);
-                        property <float> wp_y1: is_straight_vertical ? local_ty : (is_target_left ? (is_target_above ? (local_ty - 30) : (local_sy + 40)) : (is_target_above ? (local_ty - 30) : (adjusted_sy + (local_ty - adjusted_sy) / 2)));
-                        property <float> wp_x2: local_tx;
+                        property <float> midpoint_y: local_sy + (local_ty - local_sy) / 2;
+                        property <float> thick: 16.0;
 
-                        // Dynamic bounding layout calculation for the click zone
-    x: (Math.min(local_sx, Math.min(wp_x1, wp_x2)) - 10) * 1px;
-                        y: (Math.min(adjusted_sy, Math.min(wp_y1, local_ty)) - 10) * 1px;
-                        width: (Math.max(local_sx, Math.max(wp_x1, wp_x2)) - Math.min(local_sx, Math.min(wp_x1, wp_x2)) + 20) * 1px;
-                        height: (Math.max(adjusted_sy, Math.max(wp_y1, local_ty)) - Math.min(adjusted_sy, Math.min(wp_y1, local_ty)) + 20) * 1px;
+                        Path {
+                            visible: (conn.from_port == "top" && conn.to_port == "bottom");
+                            width: parent.width;
+                            height: parent.height;
+                            viewbox-x: 0;
+                            viewbox-y: 0;
+                            viewbox-width: pw;
+                            viewbox-height: ph;
+                            fill: transparent;
+                            stroke: orange;
+                            stroke-width: conn.selected ? 3px : 2px;
 
-                        clicked => {
-                            root.select_connection(index);
-                            root.selected_index = -1;
+                            MoveTo {
+                                x: local_sx;
+                                y: local_sy;
+                            }
+
+                            LineTo {
+                                x: local_sx;
+                                y: midpoint_y;
+                            }
+
+                            LineTo {
+                                x: local_tx;
+                                y: midpoint_y;
+                            }
+
+                            LineTo {
+                                x: local_tx;
+                                y: local_ty;
+                            }
                         }
-                    }
-                    if (conn.from_port == "bottom" && conn.to_port == "top"): TouchArea {
-                        property <float> local_sx: sx - left + pad;
-                        property <float> local_sy: sy - top + pad;
-                        property <float> local_tx: tx - left + pad;
-                        property <float> local_ty: ty - top + pad;
 
-                        // Perfect vertical port centering alignment corrections
-    property <float> adjusted_sx: local_sx + 1;
-                        property <float> adjusted_tx: local_tx + 1;
-                        property <float> adjusted_ty: local_ty;
+                        if (conn.from_port == "top" && conn.to_port == "bottom"): Rectangle {
+                            background: transparent;
 
-                        // Correct vertical routing check (compares horizontal X-coordinates)
-    property <bool> is_straight_vertical: Math.abs(adjusted_sx - adjusted_tx) < 2;
-                        property <bool> is_target_above: ty < sy;
+                            Rectangle {
+                                x: local_sx * 1px - (thick / 2) * 1px;
+                                y: Math.min(local_sy, midpoint_y) * 1px;
+                                width: thick * 1px;
+                                height: (Math.abs(midpoint_y - local_sy) + 1.0) * 1px;
+                                background: transparent;
+                                TouchArea {
+                                    clicked => {
+                                        root.select_connection(index);
+                                        root.selected_index = -1;
+                                    }
+                                }
+                            }
 
-                        property <float> side_offset: (is_straight_vertical || !is_target_above) ? 0 : 90;
-                        property <float> approach_offset: (is_straight_vertical || !is_target_above) ? 0 : -30;
-                        property <float> wp_y1: is_straight_vertical ? adjusted_ty : (is_target_above ? (local_sy + 40) : (local_sy + (adjusted_ty - local_sy) / 2));
+                            Rectangle {
+                                x: Math.min(local_sx, local_tx) * 1px;
+                                y: midpoint_y * 1px - (thick / 2) * 1px;
+                                width: (Math.abs(local_tx - local_sx) + 1.0) * 1px;
+                                height: thick * 1px;
+                                background: transparent;
+                                TouchArea {
+                                    clicked => {
+                                        root.select_connection(index);
+                                        root.selected_index = -1;
+                                    }
+                                }
+                            }
 
-                        // Bounding hit-box calculations matching the clean path flow
-    x: (Math.min(adjusted_sx, is_straight_vertical ? adjusted_tx : (adjusted_tx + side_offset)) - 10) * 1px;
-                        y: (Math.min(local_sy, adjusted_ty) - 10) * 1px;
-                        width: (is_straight_vertical ? 20 : (Math.abs((adjusted_tx + side_offset) - adjusted_sx) + 20)) * 1px;
-                        height: (Math.abs(adjusted_ty - local_sy) + 20) * 1px;
-
-                        clicked => {
-                            root.select_connection(index);
-                            root.selected_index = -1;
+                            Rectangle {
+                                x: local_tx * 1px - (thick / 2) * 1px;
+                                y: Math.min(midpoint_y, local_ty) * 1px;
+                                width: thick * 1px;
+                                height: (Math.abs(local_ty - midpoint_y) + 1.0) * 1px;
+                                background: transparent;
+                                TouchArea {
+                                    clicked => {
+                                        root.select_connection(index);
+                                        root.selected_index = -1;
+                                    }
+                                }
+                            }
                         }
                     }
                 }

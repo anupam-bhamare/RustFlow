@@ -162,36 +162,57 @@ ui.on_handle_port_click({
     let wire_source = wire_source.clone();
     let src_port = active_source_port.clone();
 
-    move |node_index, is_input, mode, port_name| {
+    // FIXED: Prefixed with an underscore `_is_input` to silence the compiler warning
+    move |node_index, _is_input, mode, port_name| {
         let port_str = port_name.to_string();
-        if !is_input {
+        let source = wire_source.get();
+        
+        // IF SOURCE IS -1: This is the START of a connection drag
+        if source == -1 {
             wire_source.set(node_index);
             *src_port.borrow_mut() = port_str;
-        } else {
-            let source = wire_source.get();
-            if source != -1 && source != node_index {
-                println!("Selected target node: {}", node_index);
-                
-                // FIX: Dereference the borrow guard and take the underlying String value cleanly
-                let saved_port = std::mem::take(&mut *src_port.borrow_mut());
-                let from_port_shared = slint::SharedString::from(saved_port);
-                let to_port_shared = slint::SharedString::from(port_str);
+            println!("Drag STARTED from Node {}, Port {}", node_index, port_name);
+        } 
+        // IF SOURCE IS NOT -1: This is the END of a connection drag
+        else {
+            if source != node_index {
+                let first_port = src_port.borrow().clone();
+                let second_port = port_str.clone();
 
+                // Default orientation: Click 1 -> Click 2
+                let mut final_from_index = source;
+                let mut final_to_index = node_index;
+                let mut from_port_shared = slint::SharedString::from(first_port.clone());
+                let mut to_port_shared = slint::SharedString::from(second_port.clone());
+
+                // SWAP LOGIC: If the user started on a "left" port, they dragged backwards.
+                if first_port == "left" {
+                    final_from_index = node_index; 
+                    final_to_index = source;       
+                    from_port_shared = slint::SharedString::from(second_port.clone());
+                    to_port_shared = slint::SharedString::from(first_port.clone());
+                }
+
+                // FIX: We clone these values *into* the struct so that they remain available for println!
+                // Alternatively, we could print them BEFORE creating the struct, but cloning is cleaner here.
                 conn_model.push(Connection {
-                    from_index: source,
-                    to_index: node_index,
+                    from_index: final_from_index,
+                    to_index: final_to_index,
                     selected: false,
                     creation_mode: mode,
-                    from_port: from_port_shared,
-                    to_port: to_port_shared,
+                    from_port: from_port_shared.clone(),
+                    to_port: to_port_shared.clone(),
                 });
-                println!("Connected {} -> {}", source, node_index);
-            }
+                
+             println!("Line drawn from Node {}/{} to Node {}/{}", 
+    final_from_index, from_port_shared, final_to_index, to_port_shared);            }
+            
+            // Connection sequence finished, clear the state machine
             wire_source.set(-1);
+            *src_port.borrow_mut() = String::new();
         }
     }
-});
-    // =========================================
+}); // =========================================
     // SELECT CONNECTION
     // =========================================
     ui.on_select_connection({
