@@ -11,7 +11,6 @@ use std::io::Write;
 pub struct JsonNode {
     pub id: String,
     pub label: String,
-
     #[serde(rename = "node_type")]
     pub node_type: String,
     pub x_pos: f32,
@@ -19,14 +18,13 @@ pub struct JsonNode {
     pub value: String,
     pub bg_color: String,
     pub creation_mode: i32,
- 
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 pub struct JsonWire {
     pub from: String,
     pub to: String,
-    layout_mode: i32,
+    pub layout_mode: i32,
     pub from_port: String,
     pub to_port: String,
 }
@@ -37,10 +35,17 @@ pub struct FlowExport {
     pub wires: Vec<JsonWire>,
 }
 
+// History stack snapshot structure for managing Undo functionality
+#[derive(Clone, Debug)]
+pub struct CanvasStateSnapshot {
+    pub symbols: Vec<SymbolEntry>,
+    pub connections: Vec<Connection>,
+}
+
 fn main() -> Result<(), slint::PlatformError> {
     let ui = AppWindow::new()?;
 
-// Create a weak reference to safely pass into the event loop closure
+    // Create a weak reference to safely pass into the event loop closure
     let weak_app = ui.as_weak();
     
     // Schedule the window to maximize once the event loop starts spin-up
@@ -49,17 +54,48 @@ fn main() -> Result<(), slint::PlatformError> {
             ui.window().set_maximized(true);
         }
     }).unwrap();
+
     // =========================================
-    // SYMBOL MODEL
+    // DATA MODEL INITIALIZATIONS
     // =========================================
     let symbols_model = Rc::new(VecModel::<SymbolEntry>::default());
     ui.set_all_symbols(symbols_model.clone().into());
 
-    // =========================================
-    // CURRENT TOOL
-    // =========================================
-    let current_tool = Rc::new(RefCell::new("Text".to_string()));
+    let connections = Rc::new(VecModel::from(Vec::<Connection>::new()));
+    ui.set_connections(connections.clone().into());
 
+    let current_tool = Rc::new(RefCell::new("Text".to_string()));
+    
+    // Initialize the historical state snapshot stack
+    let history_stack = Rc::new(RefCell::new(Vec::<CanvasStateSnapshot>::new()));
+    let redo_stack = Rc::new(RefCell::new(Vec::<CanvasStateSnapshot>::new())); // Your initialization
+
+    // =========================================
+    // CORE HISTORY CAPTURE ENGINE
+    // =========================================
+    let save_history: Rc<dyn Fn()> = {
+        let s_model = symbols_model.clone();
+        let c_model = connections.clone();
+        let stack = history_stack.clone();
+        let r_stack = redo_stack.clone(); // <--- CLONE IT HERE FIRST
+        
+        Rc::new(move || {
+            let current_symbols: Vec<SymbolEntry> = s_model.iter().collect();
+            let current_conns: Vec<Connection> = c_model.iter().collect();
+            
+            stack.borrow_mut().push(CanvasStateSnapshot {
+                symbols: current_symbols,
+                connections: current_conns,
+            });
+            
+            // Clear the future timeline because a new action occurred
+            r_stack.borrow_mut().clear(); // <--- Uses the cloned pointer safely!
+            
+            if stack.borrow().len() > 50 {
+                stack.borrow_mut().remove(0);
+            }
+        })
+    };
     // =========================================
     // SELECT TOOL
     // =========================================
@@ -71,22 +107,24 @@ fn main() -> Result<(), slint::PlatformError> {
     }
 
     // =========================================
-    // PLACE SYMBOL (Updated to capture node_type)
+    // PLACE SYMBOL
     // =========================================
     {
         let place_model = symbols_model.clone();
-        let place_tool = current_tool.clone();
-        let ui_weak = ui.as_weak();
-ui.on_place_symbol(move |name, node_type, bg_color, x, y,mode| {
+        let save_h = save_history.clone();
+        
+        ui.on_place_symbol(move |name, node_type, bg_color, x, y, mode| {
+            save_h(); // Log history block state before structural push
             place_model.push(SymbolEntry {
                 name: name.clone(),
                 label: name.clone(),
-                node_type: node_type,     // Maps cleanly from argument #2
-                bg_color: bg_color,       // Maps cleanly from argument #3
-                x,                        // Maps cleanly from argument #4
-                y,                        // Maps cleanly from argument #5
+                node_type,     
+                bg_color,      
+                x,                                
+                y,                                
                 value: "".into(),
-                creation_mode:mode
+                creation_mode: mode,
+                //is_selected: false,
             });
         });
     }
@@ -96,18 +134,17 @@ ui.on_place_symbol(move |name, node_type, bg_color, x, y,mode| {
     // =========================================
     {
         let move_model = symbols_model.clone();
+        let save_h = save_history.clone();
+        
         ui.on_update_symbol_position(move |index, x, y| {
             if let Some(mut symbol) = move_model.row_data(index as usize) {
+                save_h(); // Capture state layout snapshot before moving
                 symbol.x = x;
                 symbol.y = y;
                 move_model.set_row_data(index as usize, symbol);
             }
         });
     }
-
-   
-
-   
 
     // =========================================
     // IMPORT XML
@@ -136,7 +173,8 @@ ui.on_place_symbol(move |name, node_type, bg_color, x, y,mode| {
                                 y,
                                 value: value.into(),
                                 bg_color: "#0d6efd".into(),
-                                creation_mode:0
+                                creation_mode: 0,
+                                //is_selected: false,
                             });
                         }
                     }
@@ -146,73 +184,64 @@ ui.on_place_symbol(move |name, node_type, bg_color, x, y,mode| {
     }
 
     // =========================================
-    // CONNECTION MODEL
-    // =========================================
-    let connections = Rc::new(VecModel::from(Vec::<Connection>::new()));
-    ui.set_connections(connections.clone().into());
-
-    // =========================================
     // WIRING LOGIC
     // =========================================
-   let wire_source = Rc::new(Cell::new(-1));
-let active_source_port = Rc::new(RefCell::new(String::new()));
+    let wire_source = Rc::new(Cell::new(-1));
+    let active_source_port = Rc::new(RefCell::new(String::new()));
 
-ui.on_handle_port_click({
-    let conn_model = connections.clone();
-    let wire_source = wire_source.clone();
-    let src_port = active_source_port.clone();
+    ui.on_handle_port_click({
+        let conn_model = connections.clone();
+        let wire_source = wire_source.clone();
+        let src_port = active_source_port.clone();
+        let save_h = save_history.clone();
 
-    // FIXED: Prefixed with an underscore `_is_input` to silence the compiler warning
-    move |node_index, _is_input, mode, port_name| {
-        let port_str = port_name.to_string();
-        let source = wire_source.get();
-        
-        // IF SOURCE IS -1: This is the START of a connection drag
-        if source == -1 {
-            wire_source.set(node_index);
-            *src_port.borrow_mut() = port_str;
-            println!("Drag STARTED from Node {}, Port {}", node_index, port_name);
-        } 
-        // IF SOURCE IS NOT -1: This is the END of a connection drag
-        else {
-            if source != node_index {
-                let first_port = src_port.borrow().clone();
-                let second_port = port_str.clone();
-
-                // Default orientation: Click 1 -> Click 2
-                let mut final_from_index = source;
-                let mut final_to_index = node_index;
-                let mut from_port_shared = slint::SharedString::from(first_port.clone());
-                let mut to_port_shared = slint::SharedString::from(second_port.clone());
-
-                // SWAP LOGIC: If the user started on a "left" port, they dragged backwards.
-                if first_port == "left" {
-                    final_from_index = node_index; 
-                    final_to_index = source;       
-                    from_port_shared = slint::SharedString::from(second_port.clone());
-                    to_port_shared = slint::SharedString::from(first_port.clone());
-                }
-
-                // FIX: We clone these values *into* the struct so that they remain available for println!
-                // Alternatively, we could print them BEFORE creating the struct, but cloning is cleaner here.
-                conn_model.push(Connection {
-                    from_index: final_from_index,
-                    to_index: final_to_index,
-                    selected: false,
-                    creation_mode: mode,
-                    from_port: from_port_shared.clone(),
-                    to_port: to_port_shared.clone(),
-                });
-                
-             println!("Line drawn from Node {}/{} to Node {}/{}", 
-    final_from_index, from_port_shared, final_to_index, to_port_shared);            }
+        move |node_index, _is_input, mode, port_name| {
+            let port_str = port_name.to_string();
+            let source = wire_source.get();
             
-            // Connection sequence finished, clear the state machine
-            wire_source.set(-1);
-            *src_port.borrow_mut() = String::new();
+            if source == -1 {
+                wire_source.set(node_index);
+                *src_port.borrow_mut() = port_str;
+                println!("Drag STARTED from Node {}, Port {}", node_index, port_name);
+            } else {
+                if source != node_index {
+                    let first_port = src_port.borrow().clone();
+                    let second_port = port_str.clone();
+
+                    let mut final_from_index = source;
+                    let mut final_to_index = node_index;
+                    let mut from_port_shared = slint::SharedString::from(first_port.clone());
+                    let mut to_port_shared = slint::SharedString::from(second_port.clone());
+
+                    if first_port == "left" {
+                        final_from_index = node_index; 
+                        final_to_index = source;       
+                        from_port_shared = slint::SharedString::from(second_port.clone());
+                        to_port_shared = slint::SharedString::from(first_port.clone());
+                    }
+
+                    save_h(); // Log the system layout topology before pushing connection wire
+
+                    conn_model.push(Connection {
+                        from_index: final_from_index,
+                        to_index: final_to_index,
+                        selected: false,
+                        creation_mode: mode,
+                        from_port: from_port_shared.clone(),
+                        to_port: to_port_shared.clone(),
+                    });
+                    
+                    println!("Line drawn from Node {}/{} to Node {}/{}", 
+                        final_from_index, from_port_shared, final_to_index, to_port_shared);            
+                }
+                
+                wire_source.set(-1);
+                *src_port.borrow_mut() = String::new();
+            }
         }
-    }
-}); // =========================================
+    });
+
+    // =========================================
     // SELECT CONNECTION
     // =========================================
     ui.on_select_connection({
@@ -233,6 +262,7 @@ ui.on_handle_port_click({
     // =========================================
     ui.on_delete_selected_connection({
         let connections = connections.clone();
+        let save_h = save_history.clone();
         move || {
             let mut delete_index = None;
             for i in 0..connections.row_count() {
@@ -244,6 +274,7 @@ ui.on_handle_port_click({
                 }
             }
             if let Some(index) = delete_index {
+                save_h(); // Save snapshot prior to wire deletion
                 connections.remove(index);
                 println!("Deleted connection {}", index);
             }
@@ -255,8 +286,10 @@ ui.on_handle_port_click({
     // =========================================
     ui.on_save_node_properties({
         let model = symbols_model.clone();
+        let save_h = save_history.clone();
         move |index, label, value| {
             if let Some(mut node) = model.row_data(index as usize) {
+                save_h(); // Snapshot property states before text alteration updates
                 node.label = label;
                 node.value = value;
                 model.set_row_data(index as usize, node);
@@ -265,28 +298,23 @@ ui.on_handle_port_click({
     });
 
     // =========================================
-    // SAVE FLOW (Scoping & Type Inference Fixed)
+    // SAVE FLOW (JSON Export Handler)
     // =========================================
     {
-        // 1. Create a fresh local weak pointer that hasn't been moved by another closure
         let ui_save_weak = ui.as_weak();
-
         let export_symbols_active = symbols_model.clone();
         let export_connections_active = connections.clone();
 
         ui.on_save_flow(move || {
             if export_symbols_active.row_count() == 0 {
-            if let Some(ui_active) = ui_save_weak.upgrade() {
-                let message = slint::SharedString::from(
-                    "There is no flow configuration to save."
-                );
-                ui_active.invoke_trigger_alert(message);
+                if let Some(ui_active) = ui_save_weak.upgrade() {
+                    let message = slint::SharedString::from("There is no flow configuration to save.");
+                    ui_active.invoke_trigger_alert(message);
+                }
+                return; 
             }
-            return; // Exit early so no empty file is created
-        }
             let mut json_nodes = Vec::new();
 
-            // 2. Map Slint Nodes from your active shared Vector Model
             for i in 0..export_symbols_active.row_count() {
                 if let Some(item) = export_symbols_active.row_data(i) {
                     let explicit_id = (i + 1).to_string();
@@ -300,12 +328,10 @@ ui.on_handle_port_click({
                         value: item.value.to_string(),
                         bg_color: if item.bg_color.is_empty() { "#0d6efd".to_string() } else { item.bg_color.to_string() },
                         creation_mode: item.creation_mode,
-
                     });
                 }
             }
 
-            // 3. Map Slint Connections into wires
             let mut json_wires = Vec::new();
             for i in 0..export_connections_active.row_count() {
                 if let Some(conn) = export_connections_active.row_data(i) {
@@ -313,43 +339,32 @@ ui.on_handle_port_click({
                         from: format!("node_{}", conn.from_index + 1),
                         to: format!("node_{}", conn.to_index + 1),
                         layout_mode: conn.creation_mode,
-                        from_port:conn.from_port.to_string(),
-                        to_port:conn.to_port.to_string()
+                        from_port: conn.from_port.to_string(),
+                        to_port: conn.to_port.to_string()
                     });
                 }
             }
 
-            // 4. Assemble the full manifest bundle
             let export_data = FlowExport {
                 nodes: json_nodes,
                 wires: json_wires,
             };
 
-            // 5. Generate dynamic filename using current timestamp
             let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S").to_string();
             let filename = format!("flow_layout_{}.json", timestamp);
 
-            // 6. Save file out to disk and trigger popup dialog alerts via upgraded weak reference
             if let Ok(json_string) = serde_json::to_string_pretty(&export_data) {
                 match File::create(&filename) {
                     Ok(mut file) => {
                         let _ = file.write_all(json_string.as_bytes());
-                        
-                        // Safely upgrade our fresh, local weak handle
                         if let Some(ui_active) = ui_save_weak.upgrade() {
-                            let message = slint::SharedString::from(format!(
-                                "Flow configuration successfully saved to:\n{}", 
-                                filename
-                            ));
+                            let message = slint::SharedString::from(format!("Flow configuration successfully saved to:\n{}", filename));
                             ui_active.invoke_trigger_alert(message);
                         }
                     }
                     Err(e) => {
                         if let Some(ui_active) = ui_save_weak.upgrade() {
-                            let message = slint::SharedString::from(format!(
-                                "Failed to create file:\n{:?}", 
-                                e
-                            ));
+                            let message = slint::SharedString::from(format!("Failed to create file:\n{:?}", e));
                             ui_active.invoke_trigger_alert(message);
                         }
                     }
@@ -359,15 +374,15 @@ ui.on_handle_port_click({
     }
     
     // =========================================
-    // LOAD FLOW (Model Methods & Struct Fields Fixed)
+    // LOAD FLOW (JSON De-serialization Engine)
     // =========================================
     {
         let import_symbols = symbols_model.clone();
         let import_connections = connections.clone();
         let ui_load_weak = ui.as_weak();
+        let save_h = save_history.clone();
 
         ui.on_load_flow(move || {
-            // 1. Open Native File Picker Filtered for JSON
             let file_picker = rfd::FileDialog::new()
                 .add_filter("JSON Flow Profiles", &["json"])
                 .set_title("Select Flow Configuration Layout")
@@ -378,7 +393,6 @@ ui.on_handle_port_click({
                 None => return,
             };
 
-            // 2. Read string payload contents from selected file
             let file_data = match File::open(&path) {
                 Ok(mut file) => {
                     let mut contents = String::new();
@@ -391,7 +405,6 @@ ui.on_handle_port_click({
                 Err(_) => return,
             };
 
-            // 3. Deserialize JSON configuration back into Memory
             let decoded_flow: FlowExport = match serde_json::from_str(&file_data) {
                 Ok(flow) => flow,
                 Err(e) => {
@@ -403,11 +416,11 @@ ui.on_handle_port_click({
                 }
             };
 
-            // 4. Create local vectors to hold the loaded records
+            save_h(); // Log history snapshot so a freshly wiped canvas step can be undone
+
             let mut fresh_symbols = Vec::new();
             let mut fresh_connections = Vec::new();
 
-            // 5. Populate Symbols/Nodes
             for node in decoded_flow.nodes {
                 fresh_symbols.push(SymbolEntry {
                     name: node.label.clone().into(),
@@ -418,10 +431,10 @@ ui.on_handle_port_click({
                     value: node.value.into(),
                     bg_color: node.bg_color.into(),
                     creation_mode: node.creation_mode,
+                    //is_selected: false,
                 });
             }
 
-            // 6. Map Wires (Converting 1-indexed string representations back to numbers)
             for wire in decoded_flow.wires {
                 let from_id_str = wire.from.replace("node_", "");
                 let to_id_str = wire.to.replace("node_", "");
@@ -431,97 +444,163 @@ ui.on_handle_port_click({
                         from_index: from_val - 1,
                         to_index: to_val - 1,
                         selected: false, 
-                        creation_mode:wire.layout_mode,// <-- FIXED: Added the missing field initialization
-                // Convert native Rust String types directly into Slint's SharedString structure
-            from_port: slint::SharedString::from(&wire.from_port),
-            to_port: slint::SharedString::from(&wire.to_port),
+                        creation_mode: wire.layout_mode,
+                        from_port: slint::SharedString::from(&wire.from_port),
+                        to_port: slint::SharedString::from(&wire.to_port),
                     });
                 }
             }
 
-            // 7. SWAP CORES VIA .set_vec() - Cleans canvas and applies fresh layouts cleanly
             import_symbols.set_vec(fresh_symbols);
             import_connections.set_vec(fresh_connections);
 
-            // 8. Fire Success Alert
             if let Some(ui_active) = ui_load_weak.upgrade() {
                 let filename = path.file_name().unwrap_or_default().to_string_lossy();
-                let message = slint::SharedString::from(format!(
-                    "Flow composition parsed successfully!\nLoaded File: {}", 
-                    filename
-                ));
+                let message = slint::SharedString::from(format!("Flow composition parsed successfully!\nLoaded File: {}", filename));
                 ui_active.invoke_trigger_alert(message);
             }
         });
     } 
-    let delete_model = symbols_model.clone();
-let ui_weak = ui.as_weak();      
 
-// Make sure your event handler uses the explicit block-cloning pattern we talked about!
-ui.on_delete_selected_symbol({
-    let connections = connections.clone();
-    let delete_model = delete_model.clone();
+    // =========================================
+    // DELETE SYMBOL
+    // =========================================
+    {
+        let delete_model = symbols_model.clone();
+        let ui_weak = ui.as_weak();      
+        let save_h = save_history.clone();
 
-    move || {
-        if let Some(ui) = ui_weak.upgrade() {
-            let index = ui.get_selected_index();
-            if index != -1 {
-                let target_index = index as i32; // match the i32 type of from_index/to_index
+        ui.on_delete_selected_symbol({
+            let connections = connections.clone();
+            let delete_model = delete_model.clone();
+            let save_h = save_h.clone();
 
-                // 1. Loop BACKWARDS through connections to safely modify/remove them
-                for i in (0..connections.row_count()).rev() {
-                    if let Some(mut conn) = connections.row_data(i) {
-                        
-                        // Scenario A: Connection is attached to the deleted node -> REMOVE IT
-                        if conn.from_index == target_index || conn.to_index == target_index {
-                            connections.remove(i);
-                            println!("Removed broken connection at index {}", i);
-                        } 
-                        // Scenario B: Connection is further down the list -> SHIFT INDEX DOWN
-                        else {
-                            let mut changed = false;
-                            if conn.from_index > target_index {
-                                conn.from_index -= 1;
-                                changed = true;
-                            }
-                            if conn.to_index > target_index {
-                                conn.to_index -= 1;
-                                changed = true;
-                            }
-                            // Update the model row data if indices changed
-                            if changed {
-                                connections.set_row_data(i, conn);
+            move || {
+                if let Some(ui) = ui_weak.upgrade() {
+                    let index = ui.get_selected_index();
+                    if index != -1 {
+                        save_h(); // Log step context state map data changes before removing indices
+
+                        let target_index = index as i32;
+                        for i in (0..connections.row_count()).rev() {
+                            if let Some(mut conn) = connections.row_data(i) {
+                                if conn.from_index == target_index || conn.to_index == target_index {
+                                    connections.remove(i);
+                                    println!("Removed broken connection at index {}", i);
+                                } else {
+                                    let mut changed = false;
+                                    if conn.from_index > target_index {
+                                        conn.from_index -= 1;
+                                        changed = true;
+                                    }
+                                    if conn.to_index > target_index {
+                                        conn.to_index -= 1;
+                                        changed = true;
+                                    }
+                                    if changed {
+                                        connections.set_row_data(i, conn);
+                                    }
+                                }
                             }
                         }
+
+                        let index_usize = index as usize;
+                        if index_usize < delete_model.row_count() {
+                            delete_model.remove(index_usize);
+                            println!("Deleted symbol at index {}", index_usize);
+                        }
+
+                        ui.set_selected_index(-1);
                     }
                 }
-
-                // 2. Safely remove the symbol itself
-                let index_usize = index as usize;
-                if index_usize < delete_model.row_count() {
-                    delete_model.remove(index_usize);
-                    println!("Deleted symbol at index {}", index_usize);
-                }
-
-                // 3. Reset selection
-                ui.set_selected_index(-1);
             }
-        }
+        });
     }
-    
-});
 
- // =========================================
+    // =========================================
     // CLEAR CANVAS
     // =========================================
     {
         let clear_model = symbols_model.clone();
-        let clear_symbols = symbols_model.clone();
         let clear_connections = connections.clone();
+        let save_h = save_history.clone();
         ui.on_clear_canvas(move || {
+            save_h(); // Capture history framework stack frame state before total wipeouts
             clear_model.set_vec(vec![]);
-                  clear_symbols.set_vec(vec![]);
-                    clear_connections.set_vec(vec![]);
+            clear_connections.set_vec(vec![]);
+        });
+    }
+
+
+   // =========================================
+    // UNDO ENGINE ACTION HANDLER (Updated for Redo)
+    // =========================================
+    {
+        let undo_symbols = symbols_model.clone();
+        let undo_connections = connections.clone();
+        let undo_stack = history_stack.clone();
+        let r_stack = redo_stack.clone(); // Kept variable name clean
+        
+        ui.on_undo_action(move || {
+            let mut u_stack = undo_stack.borrow_mut();
+            let mut redo_stk = r_stack.borrow_mut();
+            
+            // 1. Pop the previous state off the undo stack
+            if let Some(previous_state) = u_stack.pop() {
+                
+                // ─── THE REDO MAGIC HAPPENS HERE ───
+                // 2. Capture what the canvas looks like RIGHT NOW (Before restoring the past)
+                let current_state = CanvasStateSnapshot {
+                    symbols: undo_symbols.iter().collect(),
+                    connections: undo_connections.iter().collect(),
+                };
+                
+                // 3. Push that current state onto the redo stack
+                redo_stk.push(current_state);
+                
+                // 4. Finally, travel back in time by restoring the old state
+                undo_symbols.set_vec(previous_state.symbols);
+                undo_connections.set_vec(previous_state.connections);
+                
+                println!("Undo executed. Undo stack: {}, Redo stack: {}", u_stack.len(), redo_stk.len());
+            } else {
+                println!("No historical snapshot items left to restore.");
+            }
+        });
+    }
+    // =========================================
+    // REDO ENGINE ACTION HANDLER
+    // =========================================
+    {
+        let redo_symbols = symbols_model.clone();
+        let redo_connections = connections.clone();
+        let undo_stack = history_stack.clone();
+        let r_stack = redo_stack.clone();
+        
+        ui.on_redo_action(move || {
+            let mut u_stack = undo_stack.borrow_mut();
+            let mut redo_stk = r_stack.borrow_mut();
+            
+            // 1. Check if there is a "future" state available to restore
+            if let Some(next_state) = redo_stk.pop() {
+                
+                // 2. Capture the current state of the canvas before overwriting it
+                let current_state = CanvasStateSnapshot {
+                    symbols: redo_symbols.iter().collect(),
+                    connections: redo_connections.iter().collect(),
+                };
+                
+                // 3. Push the current state onto the undo stack so the user can "Undo" this Redo
+                u_stack.push(current_state);
+                
+                // 4. Apply the popped state back to the active canvas models
+                redo_symbols.set_vec(next_state.symbols);
+                redo_connections.set_vec(next_state.connections);
+                
+                println!("Redo executed. Undo stack: {}, Redo stack: {}", u_stack.len(), redo_stk.len());
+            } else {
+                println!("No actions left to redo!");
+            }
         });
     }
     ui.run()
