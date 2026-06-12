@@ -241,7 +241,7 @@ export component AppWindow inherits Window {
     callback node_clicked(int, bool);
     callback canvas_clicked();
     callback copy_node(int);
-    callback cut_node(int);    
+    callback cut_node(int);
     callback undo_action();
     callback redo_action();
     callback vertical_layout();
@@ -1212,23 +1212,34 @@ export component AppWindow inherits Window {
 
                     if (root.is_pasting_mode): Rectangle {
 
-                        width: 100%;
-                        height: 100%;
-
-                        for ghost in root.ghost_symbols: NodeSymbol {
-                            label: ghost.label;
-                            creation_mode: ghost.creation_mode;
-
-                            property <bool> is_connector: ghost.node_type == "ip_connector" || ghost.node_type == "op_connector";
+                        for ghost in root.ghost_symbols: Rectangle {
+                            property <bool> is_InputConnector: ghost.node_type == "ip_connector";
+                            property <bool> is_OutputConnector: ghost.node_type == "op_connector";
+                            property <bool> is_connector: is_InputConnector || is_OutputConnector;
                             width: is_connector ? 60px : 120px;
                             height: 40px;
+                            x: root.live_mouse_x + (ghost.x * 1px);
+                            y: root.live_mouse_y + (ghost.y * 1px);
                             background: #0d6efd.with_alpha(25%);
                             border-color: #0d6efd;
                             border-width: 2px;
                             border-radius: 4px;
-
-                            x: root.live_mouse_x + (ghost.x * 1px);
-                            y: root.live_mouse_y + (ghost.y * 1px);
+                            if (is_InputConnector): InputConnectorSymbol {
+                                width: parent.width;
+                                height: parent.height;
+                                label: ghost.label;
+                            }
+                            if (is_OutputConnector): OutputConnectorSymbol {
+                                width: parent.width;
+                                height: parent.height;
+                                label: ghost.label;
+                            }
+                            if (!is_connector): NodeSymbol {
+                                width: parent.width;
+                                height: parent.height;
+                                label: ghost.label;
+                                creation_mode: ghost.creation_mode;
+                            }
                         }
                     }
                     for conn[index] in root.connections: Rectangle {
