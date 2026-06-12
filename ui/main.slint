@@ -9,6 +9,7 @@ export struct SymbolEntry {
     node_type: string,
     bg_color: string,
     creation_mode: int,
+    is_selected: bool,
 }
 
 export struct Connection {
@@ -30,7 +31,7 @@ component NodeSymbol inherits Rectangle {
     callback port_clicked(bool, string);
 
     in property <string> label: "Node";
-    in property <int> creation_mode: 0;
+    in property <int> creation_mode;
 
     width: 120px;
     height: 40px;
@@ -184,23 +185,7 @@ export component AppWindow inherits Window {
     preferred-height: 900px;
     min-width: 1024px;
     min-height: 700px;
-    in-out property <length> canvas_pan_x: 0px;
-    in-out property <length> canvas_pan_y: 0px;
-    property <bool> is_panning: false;
-    property <float> pan_start_x: 0;
-    property <float> pan_start_y: 0;
-    in-out property <int> active_layout_mode: 0;
-    callback undo_action();
-    callback redo_action();
-    callback vertical_layout();
-    callback horizontal_layout();
 
-    in-out property <bool> show_alert: false;
-    in-out property <string> alert_message: "";
-    public function trigger_alert(msg: string) {
-        root.alert_message = msg;
-        root.show_alert = true;
-    }
     property <bool> common_expanded: false;
     property <bool> function_expanded: false;
     property <bool> parser_expanded: false;
@@ -210,14 +195,30 @@ export component AppWindow inherits Window {
     property <bool> actions_expanded: false;
     property <bool> layout_expanded: false;
     property <bool> connectors_expanded: false;
-    in-out property <[SymbolEntry]> all_symbols: [];
-
-    in-out property <[Connection]> connections: [];
-
-    in-out property <int> selected_index: -1;
-
     property <bool> prevent_placement: false;
-
+    property <bool> is_panning: false;
+    property <[int]> backup_selected_indexes: [];
+    property <length> menu_x: 0px;
+    property <length> menu_y: 0px;
+    property <bool> menu_visible: false;
+    property <int> active_node_index: -1;
+    property <float> pan_start_x: 0;
+    property <float> pan_start_y: 0;
+    in-out property <[SymbolEntry]> nodes: [];
+    in-out property <int> selected_node_index: -1;
+    in-out property <[int]> selected_indexes: [];
+    in-out property <[SymbolEntry]> all_symbols: [];
+    in-out property <[Connection]> connections: [];
+    in-out property <[SymbolEntry]> ghost_symbols: [];
+    in-out property <[Connection]> ghost_connections: [];
+    in-out property <bool> is_pasting_mode: false;
+    in-out property <length> live_mouse_x: 0px;
+    in-out property <length> live_mouse_y: 0px;
+    in-out property <length> canvas_pan_x: 0px;
+    in-out property <length> canvas_pan_y: 0px;
+    in-out property <int> active_layout_mode: 0;
+    in-out property <bool> show_alert: false;
+    in-out property <string> alert_message: "";
     in-out property <bool> is_dragging: false;
     in-out property <string> drag_name: "";
     in-out property <int> creation_mode: 0;
@@ -226,31 +227,49 @@ export component AppWindow inherits Window {
     in-out property <float> drag_x: 0;
     in-out property <float> drag_y: 0;
     in-out property <bool> show_node_modal: false;
-
     in-out property <string> edit_label: "";
     in-out property <string> edit_value: "";
-
     in-out property <int> editing_index: -1;
+    in-out property <int> selected_index: -1;
 
+    callback delete_selected_symbols();
+    callback select_all();
+    callback cut_nodes();
+    callback copy_selected_subgraph([int]);
+    callback paste_selected_subgraph(float, float);
+    callback cut_selected_subgraph([int]);
+    callback node_clicked(int, bool);
+    callback canvas_clicked();
+    callback copy_node(int);
+    callback cut_node(int);    
+    callback undo_action();
+    callback redo_action();
+    callback vertical_layout();
+    callback horizontal_layout();
     callback save_node_properties(int, string, string);
-
     callback select_library_symbol(string);
     callback place_symbol(string, string, string, float, float, int);
-
     callback update_symbol_position(int, float, float);
-
     callback delete_selected_symbol();
-
     callback clear_canvas();
-
     callback import_xml();
     callback handle_port_click(int, bool, int, string);
-
     callback select_connection(int);
-
     callback delete_selected_connection();
     callback save_flow();
     callback load_flow();
+
+    TouchArea {
+        clicked => {
+            menu_visible = false;
+        }
+    }
+
+    public function trigger_alert(msg: string) {
+        root.alert_message = msg;
+        root.show_alert = true;
+    }
+
     Rectangle {
         width: 100%;
         height: 100%;
@@ -263,6 +282,11 @@ export component AppWindow inherits Window {
                 background: #f7f7f7;
                 border-width: 1px;
                 border-color: #dcdcdc;
+                TouchArea {
+                    clicked => {
+                        menu_visible = false;
+                    }
+                }
 
                 VerticalLayout {
                     padding: 10px;
@@ -916,8 +940,33 @@ export component AppWindow inherits Window {
                     height: 100%;
 
                     key-pressed(event) => {
-        // 1. UNDO SHORTCUT (Ctrl + Z)
-        if (event.text == "z" && event.modifiers.control) {
+                        let is_modifier_pressed = event.modifiers.control || event.modifiers.meta;
+                        if (is_modifier_pressed) {
+                            if (event.text == "c") {
+                                debug("Keyboard shortcut Ctrl+C pressed! Selected count: ", root.selected_indexes.length);
+                                root.copy_selected_subgraph(root.selected_indexes);
+                                return EventResult.accept;
+                            }
+                            if (event.text == "x") {
+                                root.cut_selected_subgraph(root.selected_indexes);
+                                accept;
+                            }
+                            if (event.text == "a") {
+                                root.select_all();
+                                return EventResult.accept;
+                            }
+                            if (event.text == "v") {
+
+                                root.paste_selected_subgraph(    (-root.canvas_pan_x / 1px) + 300,     (-root.canvas_pan_y / 1px) + 200);
+
+                                root.selected_index = -1;
+
+                                root.selected_indexes = [];
+                                return EventResult.accept;
+                            }
+                            EventResult.reject;
+                        }
+                        if (event.text == "z" && event.modifiers.control) {
                             root.undo_action();
                             accept;
                         }
@@ -925,22 +974,17 @@ export component AppWindow inherits Window {
                             root.redo_action();
                             accept;
                         }
-        // 2. DELETE ACTIONS
-        if (event.text == Key.Delete) {
+                        if (event.text == Key.Delete) {
                             if (root.selected_index != -1) {
                                 root.delete_selected_symbol();
                                 accept;
                             } else {
-                // Only deletes a connection if NO symbol is selected and Delete is explicitly pressed
-                root.delete_selected_connection();
+                                root.delete_selected_connection();
                                 accept;
                             }
                         }
-
-        // 3. NODE NUDGING / MOVEMENT ACTIONS
-        if (root.selected_index != -1) {
-            // Adjust delta steps based on Shift modifier (e.g., 1px vs 15px grid snap)
-            let delta: float = event.modifiers.shift ? 1.0 : 15.0;
+                        if (root.selected_index != -1) {
+                            let delta: float = event.modifiers.shift ? 1.0 : 2.0;
 
                             if (event.text == Key.LeftArrow) {
                                 root.update_symbol_position(root.selected_index, (root.all_symbols[root.selected_index].x - delta), root.all_symbols[root.selected_index].y);
@@ -959,28 +1003,52 @@ export component AppWindow inherits Window {
                                 accept;
                             }
                         }
-
-        // Let standard input processing handle everything else
-        reject;
+                        reject;
                     }
                 }
 
                 TouchArea {
                     width: 100%;
                     height: 100%;
+
+                    property <physical-length> right_click_press_x: 0;
+                    property <physical-length> right_click_press_y: 0;
+
                     pointer-event(event) => {
-                        // Detect Right-Click press
-                        if (event.kind == PointerEventKind.down && event.button == PointerEventButton.right) {
-                            //self.focus();
-                            root.is_panning = true;
-                            root.pan_start_x = self.mouse-x / 1px;
-                            root.pan_start_y = self.mouse-y / 1px;
+                        if (event.button == PointerEventButton.right) {
+                            if (event.kind == PointerEventKind.down) {
+                                root.is_panning = true;
+                                root.pan_start_x = self.mouse-x / 1px;
+                                root.pan_start_y = self.mouse-y / 1px;
+
+                                right_click_press_x = self.mouse-x;
+                                right_click_press_y = self.mouse-y;
+                                menu_visible = false;
+                            }
+                            if (event.kind == PointerEventKind.up) {
+                                root.is_panning = false;
+                                let dx = (self.mouse-x - right_click_press_x) / 1px;
+                                let dy = (self.mouse-y - right_click_press_y) / 1px;
+                                let drag_distance_sq = (dx * dx) + (dy * dy);
+
+                                if (drag_distance_sq < 16) {
+                                    root.selected_index = -1;
+                                    root.select_connection(-1);
+                                    root.selected_indexes = [];
+                                    root.node_clicked(-1, false);
+
+                                    menu_x = self.mouse-x + 260px;
+                                    menu_y = self.mouse-y;
+                                    menu_visible = true;
+                                }
+                            }
                         }
-                        // Detect Right-Click release
-                        if (event.kind == PointerEventKind.up && event.button == PointerEventButton.right) {
-                            root.is_panning = false;
+                        if (event.kind == PointerEventKind.move) {
+                            root.live_mouse_x = self.mouse-x;
+                            root.live_mouse_y = self.mouse-y;
                         }
                     }
+
                     moved => {
                         if (root.is_dragging) {
                             root.drag_x = self.mouse-x / 1px;
@@ -989,9 +1057,8 @@ export component AppWindow inherits Window {
                         if (root.is_panning) {
                             let current_x = self.mouse-x / 1px;
                             let current_y = self.mouse-y / 1px;
-                            
-                            // Multiply by 1px to cleanly convert the float delta to a length type
-                          root.canvas_pan_x += (current_x - root.pan_start_x) * 1px;
+
+                            root.canvas_pan_x += (current_x - root.pan_start_x) * 1px;
                             root.canvas_pan_y += (current_y - root.pan_start_y) * 1px;
                             root.pan_start_x = current_x;
                             root.pan_start_y = current_y;
@@ -999,23 +1066,28 @@ export component AppWindow inherits Window {
                     }
 
                     clicked => {
-                        ForwardFocus.focus();
-                        if (root.is_dragging) {
-                            let is_connector = root.drag_name == "A" || root.drag_name == "B";
-                            let shape_w = is_connector ? 60 : 120;
-                            let shape_h = is_connector ? 40 : 40;
-                            let drop_x = root.drag_x;
-                            let drop_y = root.drag_y;
-                            root.place_symbol(
-                            root.drag_name,   
-                            root.drag_type,                    
-                            "#0d6efd",          
-                            drop_x,                          
-                            drop_y, 
-                            root.active_layout_mode);
-                            root.is_dragging = false;
-                        } else if (root.selected_index != -1) {
+                        if (root.is_pasting_mode) {
+                            root.canvas_clicked();
+                            root.is_pasting_mode = false; // Drops the nodes!
+                            } else {
+                            menu_visible = false;
                             root.selected_index = -1;
+                            root.select_connection(-1);
+                            ForwardFocus.focus();
+                            root.selected_indexes = [];
+
+                            if (root.is_dragging) {
+                                let is_connector = root.drag_name == "A" || root.drag_name == "B";
+                                let shape_w = is_connector ? 60 : 120;
+                                let shape_h = is_connector ? 40 : 40;
+                                let drop_x = root.drag_x;
+                                let drop_y = root.drag_y;
+
+                                root.place_symbol(root.drag_name, root.drag_type, "#0d6efd", drop_x, drop_y, root.active_layout_mode);
+                                root.is_dragging = false;
+                            } else if (root.selected_index != -1) {
+                                root.selected_index = -1;
+                            }
                         }
                     }
 
@@ -1042,14 +1114,12 @@ export component AppWindow inherits Window {
                             creation_mode: root.active_layout_mode;
                         }
                         if (!is_InputConnector && !is_OutConnector): NodeSymbol {
-
                             width: 100%;
                             height: 100%;
                             label: root.drag_name;
                             creation_mode: root.active_layout_mode;
                         }
                     }
-
                     for item[i] in root.all_symbols: Rectangle {
                         z: 2;
                         property <bool> is_InputConnector: item.node_type == "ip_connector";
@@ -1060,12 +1130,13 @@ export component AppWindow inherits Window {
                         x: item.x * 1px - 60px + root.canvas_pan_x;
                         y: item.y * 1px - 20px + root.canvas_pan_y;
 
-                        if (root.selected_index == i): Rectangle {
+                        property <bool> node-is-selected: item.is_selected;
+
+                        if (node-is-selected && (root.selected_index == i || root.selected_indexes.length > 1)): Rectangle {
                             border-width: 3px;
                             border-radius: 4px;
                             border-color: #0288d1;
                         }
-
                         if (is_InputConnector): InputConnectorSymbol {
                             width: 100%;
                             height: 100%;
@@ -1083,15 +1154,13 @@ export component AppWindow inherits Window {
                             }
                         }
                         if (!is_connector): NodeSymbol {
-
                             width: 100%;
                             height: 100%;
                             label: item.label == "" ? item.name : item.label;
                             creation_mode: item.creation_mode;
                             port_clicked(is_input, port_name) => {
-                                let final_is_input = (!is_input && (port_name == "left" || port_name == "top")) ? true : is-input;
+                                let final_is_input = (!is_input && (port_name == "left" || port_name == "top")) ? true : is_input;
                                 debug("Port Clicked - Name:", port_name, "| Is Input:", final_is_input);
-
                                 root.handle_port_click(i, final_is_input, item.creation_mode, port_name);
                             }
                         }
@@ -1099,11 +1168,36 @@ export component AppWindow inherits Window {
                         TouchArea {
                             width: 100%;
                             height: 100%;
+
+                            property <bool> shift-is-pressed: false;
+
+                            pointer-event(evt) => {
+                                shift-is-pressed = evt.modifiers.shift;
+
+                                if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
+                                    if (!item.is_selected) {
+                                        root.selected_index = i;
+                                        root.node_clicked(i, evt.modifiers.shift);
+                                    }
+                                    root.backup_selected_indexes = root.selected_indexes;
+                                    active_node_index = i;
+
+                                    menu_x = self.mouse-x + (item.x * 1px - 60px) + root.canvas_pan_x + 260px;
+                                    menu_y = self.mouse-y + (item.y * 1px) + root.canvas_pan_y;
+
+                                    menu_visible = true;
+                                    return EventResult.accept;
+                                }
+                                return EventResult.reject;
+                            }
+
                             clicked => {
                                 root.selected_index = i;
+                                root.node_clicked(i, shift-is-pressed);
+                                menu_visible = false;
                             }
                             double-clicked => {
-                                root.selected_index = i;
+                                root.node_clicked(i, false);
                                 root.prevent_placement = true;
                                 root.editing_index = i;
                                 root.edit_label = item.label;
@@ -1111,27 +1205,35 @@ export component AppWindow inherits Window {
                                 root.show_node_modal = true;
                             }
                             moved => {
-                                root.update_symbol_position(
-                                i,
-                                (self.mouse-x + parent.x + 60px) / 1px,
-                                (self.mouse-y + parent.y + 20px) / 1px);
+                                root.update_symbol_position(i, (self.mouse-x + parent.x + 60px) / 1px, (self.mouse-y + parent.y + 20px) / 1px);
                             }
                         }
                     }
 
+                    if (root.is_pasting_mode): Rectangle {
+
+                        width: 100%;
+                        height: 100%;
+
+                        for ghost in root.ghost_symbols: NodeSymbol {
+                            label: ghost.label;
+                            creation_mode: ghost.creation_mode;
+
+                            property <bool> is_connector: ghost.node_type == "ip_connector" || ghost.node_type == "op_connector";
+                            width: is_connector ? 60px : 120px;
+                            height: 40px;
+                            background: #0d6efd.with_alpha(25%);
+                            border-color: #0d6efd;
+                            border-width: 2px;
+                            border-radius: 4px;
+
+                            x: root.live_mouse_x + (ghost.x * 1px);
+                            y: root.live_mouse_y + (ghost.y * 1px);
+                        }
+                    }
                     for conn[index] in root.connections: Rectangle {
 
-                        /*  property <string> source_name: root.all_symbols[conn.from_index].node_type;
-                    property <string> target_name: root.all_symbols[conn.to_index].node_type;
-
-                    Text {
-                        text: "Wire " + index + ": From (" + source_name + ") to (" + target_name + ")";
-                        color: #ff00ff;
-                        font-size: 11px;
-                        y: -18px; // Positions it right above the line
-                    }    */
-
-                    property <bool> isOutputConnector: root.all_symbols[conn.from_index].node_type == "op_connector";
+                        property <bool> isOutputConnector: root.all_symbols[conn.from_index].node_type == "op_connector";
                         property <bool> isInputConnector: root.all_symbols[conn.to_index].node_type == "ip_connector";
                         property <float> from_hw: isOutputConnector ? 0 : 60;
                         property <float> to_hw: isInputConnector ? 60 : 60;
@@ -1224,9 +1326,24 @@ export component AppWindow inherits Window {
                                     height: thick * 1px;
                                     background: transparent;
                                     TouchArea {
+                                        pointer-event(evt) => {
+                                            if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
+                                                root.select_connection(index);
+                                                root.selected_index = -1;
+                                                active_node_index = index;
+
+                                                menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
+                                                menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
+
+                                                menu_visible = true;
+                                                return EventResult.accept;
+                                            }
+                                            return EventResult.reject;
+                                        }
                                         clicked => {
                                             root.select_connection(index);
                                             root.selected_index = -1;
+                                            menu_visible = false;
                                         }
                                     }
                                 }
@@ -1238,9 +1355,24 @@ export component AppWindow inherits Window {
                                     height: (Math.abs(wp_y1 - adjusted_sy) + 1.0) * 1px;
                                     background: transparent;
                                     TouchArea {
+                                        pointer-event(evt) => {
+                                            if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
+                                                root.select_connection(index);
+                                                root.selected_index = -1;
+                                                active_node_index = index;
+
+                                                menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
+                                                menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
+
+                                                menu_visible = true;
+                                                return EventResult.accept;
+                                            }
+                                            return EventResult.reject;
+                                        }
                                         clicked => {
                                             root.select_connection(index);
                                             root.selected_index = -1;
+                                            menu_visible = false;
                                         }
                                     }
                                 }
@@ -1252,9 +1384,24 @@ export component AppWindow inherits Window {
                                     height: thick * 1px;
                                     background: transparent;
                                     TouchArea {
+                                        pointer-event(evt) => {
+                                            if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
+                                                root.select_connection(index);
+                                                root.selected_index = -1;
+                                                active_node_index = index;
+
+                                                menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
+                                                menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
+
+                                                menu_visible = true;
+                                                return EventResult.accept;
+                                            }
+                                            return EventResult.reject;
+                                        }
                                         clicked => {
                                             root.select_connection(index);
                                             root.selected_index = -1;
+                                            menu_visible = false;
                                         }
                                     }
                                 }
@@ -1266,9 +1413,24 @@ export component AppWindow inherits Window {
                                     height: (Math.abs(local_ty - wp_y1) + 1.0) * 1px;
                                     background: transparent;
                                     TouchArea {
+                                        pointer-event(evt) => {
+                                            if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
+                                                root.select_connection(index);
+                                                root.selected_index = -1;
+                                                active_node_index = index;
+
+                                                menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
+                                                menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
+
+                                                menu_visible = true;
+                                                return EventResult.accept;
+                                            }
+                                            return EventResult.reject;
+                                        }
                                         clicked => {
                                             root.select_connection(index);
                                             root.selected_index = -1;
+                                            menu_visible = false;
                                         }
                                     }
                                 }
@@ -1342,9 +1504,24 @@ export component AppWindow inherits Window {
                                     height: (Math.abs(wp_y1 - local_sy) + 1.0) * 1px;
                                     background: transparent;
                                     TouchArea {
+                                        pointer-event(evt) => {
+                                            if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
+                                                root.select_connection(index);
+                                                root.selected_index = -1;
+                                                active_node_index = index;
+
+                                                menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
+                                                menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
+
+                                                menu_visible = true;
+                                                return EventResult.accept;
+                                            }
+                                            return EventResult.reject;
+                                        }
                                         clicked => {
                                             root.select_connection(index);
                                             root.selected_index = -1;
+                                            menu_visible = false;
                                         }
                                     }
                                 }
@@ -1356,9 +1533,24 @@ export component AppWindow inherits Window {
                                     height: thick * 1px;
                                     background: transparent;
                                     TouchArea {
+                                        pointer-event(evt) => {
+                                            if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
+                                                root.select_connection(index);
+                                                root.selected_index = -1;
+                                                active_node_index = index;
+
+                                                menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
+                                                menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
+
+                                                menu_visible = true;
+                                                return EventResult.accept;
+                                            }
+                                            return EventResult.reject;
+                                        }
                                         clicked => {
                                             root.select_connection(index);
                                             root.selected_index = -1;
+                                            menu_visible = false;
                                         }
                                     }
                                 }
@@ -1370,9 +1562,24 @@ export component AppWindow inherits Window {
                                     height: (Math.abs(target_y - wp_y1) + 1.0) * 1px;
                                     background: transparent;
                                     TouchArea {
+                                        pointer-event(evt) => {
+                                            if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
+                                                root.select_connection(index);
+                                                root.selected_index = -1;
+                                                active_node_index = index;
+
+                                                menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
+                                                menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
+
+                                                menu_visible = true;
+                                                return EventResult.accept;
+                                            }
+                                            return EventResult.reject;
+                                        }
                                         clicked => {
                                             root.select_connection(index);
                                             root.selected_index = -1;
+                                            menu_visible = false;
                                         }
                                     }
                                 }
@@ -1384,9 +1591,24 @@ export component AppWindow inherits Window {
                                     height: thick * 1px;
                                     background: transparent;
                                     TouchArea {
+                                        pointer-event(evt) => {
+                                            if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
+                                                root.select_connection(index);
+                                                root.selected_index = -1;
+                                                active_node_index = index;
+
+                                                menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
+                                                menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
+
+                                                menu_visible = true;
+                                                return EventResult.accept;
+                                            }
+                                            return EventResult.reject;
+                                        }
                                         clicked => {
                                             root.select_connection(index);
                                             root.selected_index = -1;
+                                            menu_visible = false;
                                         }
                                     }
                                 }
@@ -1462,10 +1684,26 @@ export component AppWindow inherits Window {
                                 width: (Math.abs(wp_x1 - local_sx) + 1.0) * 1px;
                                 height: thick * 1px;
                                 background: transparent;
+
                                 TouchArea {
+                                    pointer-event(evt) => {
+                                        if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
+                                            root.select_connection(index);
+                                            root.selected_index = -1;
+                                            active_node_index = index;
+
+                                            menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
+                                            menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
+
+                                            menu_visible = true;
+                                            return EventResult.accept;
+                                        }
+                                        return EventResult.reject;
+                                    }
                                     clicked => {
                                         root.select_connection(index);
                                         root.selected_index = -1;
+                                        menu_visible = false;
                                     }
                                 }
                             }
@@ -1477,9 +1715,24 @@ export component AppWindow inherits Window {
                                 height: (Math.abs(wp_y - adjusted_sy) + 1.0) * 1px;
                                 background: transparent;
                                 TouchArea {
+                                    pointer-event(evt) => {
+                                        if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
+                                            root.select_connection(index);
+                                            root.selected_index = -1;
+                                            active_node_index = index;
+
+                                            menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
+                                            menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
+
+                                            menu_visible = true;
+                                            return EventResult.accept;
+                                        }
+                                        return EventResult.reject;
+                                    }
                                     clicked => {
                                         root.select_connection(index);
                                         root.selected_index = -1;
+                                        menu_visible = false;
                                     }
                                 }
                             }
@@ -1491,9 +1744,24 @@ export component AppWindow inherits Window {
                                 height: thick * 1px;
                                 background: transparent;
                                 TouchArea {
+                                    pointer-event(evt) => {
+                                        if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
+                                            root.select_connection(index);
+                                            root.selected_index = -1;
+                                            active_node_index = index;
+
+                                            menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
+                                            menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
+
+                                            menu_visible = true;
+                                            return EventResult.accept;
+                                        }
+                                        return EventResult.reject;
+                                    }
                                     clicked => {
                                         root.select_connection(index);
                                         root.selected_index = -1;
+                                        menu_visible = false;
                                     }
                                 }
                             }
@@ -1505,9 +1773,24 @@ export component AppWindow inherits Window {
                                 height: (Math.abs(seg45_y - wp_y) + 1.0) * 1px;
                                 background: transparent;
                                 TouchArea {
+                                    pointer-event(evt) => {
+                                        if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
+                                            root.select_connection(index);
+                                            root.selected_index = -1;
+                                            active_node_index = index;
+
+                                            menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
+                                            menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
+
+                                            menu_visible = true;
+                                            return EventResult.accept;
+                                        }
+                                        return EventResult.reject;
+                                    }
                                     clicked => {
                                         root.select_connection(index);
                                         root.selected_index = -1;
+                                        menu_visible = false;
                                     }
                                 }
                             }
@@ -1519,9 +1802,24 @@ export component AppWindow inherits Window {
                                 height: thick * 1px;
                                 background: transparent;
                                 TouchArea {
+                                    pointer-event(evt) => {
+                                        if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
+                                            root.select_connection(index);
+                                            root.selected_index = -1;
+                                            active_node_index = index;
+
+                                            menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
+                                            menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
+
+                                            menu_visible = true;
+                                            return EventResult.accept;
+                                        }
+                                        return EventResult.reject;
+                                    }
                                     clicked => {
                                         root.select_connection(index);
                                         root.selected_index = -1;
+                                        menu_visible = false;
                                     }
                                 }
                             }
@@ -1599,9 +1897,24 @@ export component AppWindow inherits Window {
                                 height: (Math.abs(wp_y1 - local_sy) + 1.0) * 1px;
                                 background: transparent;
                                 TouchArea {
+                                    pointer-event(evt) => {
+                                        if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
+                                            root.select_connection(index);
+                                            root.selected_index = -1;
+                                            active_node_index = index;
+
+                                            menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
+                                            menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
+
+                                            menu_visible = true;
+                                            return EventResult.accept;
+                                        }
+                                        return EventResult.reject;
+                                    }
                                     clicked => {
                                         root.select_connection(index);
                                         root.selected_index = -1;
+                                        menu_visible = false;
                                     }
                                 }
                             }
@@ -1613,9 +1926,24 @@ export component AppWindow inherits Window {
                                 height: thick * 1px;
                                 background: transparent;
                                 TouchArea {
+                                    pointer-event(evt) => {
+                                        if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
+                                            root.select_connection(index);
+                                            root.selected_index = -1;
+                                            active_node_index = index;
+
+                                            menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
+                                            menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
+
+                                            menu_visible = true;
+                                            return EventResult.accept;
+                                        }
+                                        return EventResult.reject;
+                                    }
                                     clicked => {
                                         root.select_connection(index);
                                         root.selected_index = -1;
+                                        menu_visible = false;
                                     }
                                 }
                             }
@@ -1627,9 +1955,24 @@ export component AppWindow inherits Window {
                                 height: (Math.abs(seg34_y - wp_y1) + 1.0) * 1px;
                                 background: transparent;
                                 TouchArea {
+                                    pointer-event(evt) => {
+                                        if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
+                                            root.select_connection(index);
+                                            root.selected_index = -1;
+                                            active_node_index = index;
+
+                                            menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
+                                            menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
+
+                                            menu_visible = true;
+                                            return EventResult.accept;
+                                        }
+                                        return EventResult.reject;
+                                    }
                                     clicked => {
                                         root.select_connection(index);
                                         root.selected_index = -1;
+                                        menu_visible = false;
                                     }
                                 }
                             }
@@ -1641,9 +1984,24 @@ export component AppWindow inherits Window {
                                 height: thick * 1px;
                                 background: transparent;
                                 TouchArea {
+                                    pointer-event(evt) => {
+                                        if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
+                                            root.select_connection(index);
+                                            root.selected_index = -1;
+                                            active_node_index = index;
+
+                                            menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
+                                            menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
+
+                                            menu_visible = true;
+                                            return EventResult.accept;
+                                        }
+                                        return EventResult.reject;
+                                    }
                                     clicked => {
                                         root.select_connection(index);
                                         root.selected_index = -1;
+                                        menu_visible = false;
                                     }
                                 }
                             }
@@ -1655,9 +2013,24 @@ export component AppWindow inherits Window {
                                 height: (Math.abs(adjusted_ty - seg34_y) + 1.0) * 1px;
                                 background: transparent;
                                 TouchArea {
+                                    pointer-event(evt) => {
+                                        if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
+                                            root.select_connection(index);
+                                            root.selected_index = -1;
+                                            active_node_index = index;
+
+                                            menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
+                                            menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
+
+                                            menu_visible = true;
+                                            return EventResult.accept;
+                                        }
+                                        return EventResult.reject;
+                                    }
                                     clicked => {
                                         root.select_connection(index);
                                         root.selected_index = -1;
+                                        menu_visible = false;
                                     }
                                 }
                             }
@@ -1718,9 +2091,24 @@ export component AppWindow inherits Window {
                                     height: (Math.abs(midpoint_y - local_sy) + 1.0) * 1px;
                                     background: transparent;
                                     TouchArea {
+                                        pointer-event(evt) => {
+                                            if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
+                                                root.select_connection(index);
+                                                root.selected_index = -1;
+                                                active_node_index = index;
+
+                                                menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
+                                                menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
+
+                                                menu_visible = true;
+                                                return EventResult.accept;
+                                            }
+                                            return EventResult.reject;
+                                        }
                                         clicked => {
                                             root.select_connection(index);
                                             root.selected_index = -1;
+                                            menu_visible = false;
                                         }
                                     }
                                 }
@@ -1732,9 +2120,24 @@ export component AppWindow inherits Window {
                                     height: thick * 1px;
                                     background: transparent;
                                     TouchArea {
+                                        pointer-event(evt) => {
+                                            if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
+                                                root.select_connection(index);
+                                                root.selected_index = -1;
+                                                active_node_index = index;
+
+                                                menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
+                                                menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
+
+                                                menu_visible = true;
+                                                return EventResult.accept;
+                                            }
+                                            return EventResult.reject;
+                                        }
                                         clicked => {
                                             root.select_connection(index);
                                             root.selected_index = -1;
+                                            menu_visible = false;
                                         }
                                     }
                                 }
@@ -1746,9 +2149,24 @@ export component AppWindow inherits Window {
                                     height: (Math.abs(local_ty - midpoint_y) + 1.0) * 1px;
                                     background: transparent;
                                     TouchArea {
+                                        pointer-event(evt) => {
+                                            if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
+                                                root.select_connection(index);
+                                                root.selected_index = -1;
+                                                active_node_index = index;
+
+                                                menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
+                                                menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
+
+                                                menu_visible = true;
+                                                return EventResult.accept;
+                                            }
+                                            return EventResult.reject;
+                                        }
                                         clicked => {
                                             root.select_connection(index);
                                             root.selected_index = -1;
+                                            menu_visible = false;
                                         }
                                     }
                                 }
@@ -1758,183 +2176,418 @@ export component AppWindow inherits Window {
                 }
             }
         }
-    }
 
-    if (root.show_node_modal): Rectangle {
-        width: parent.width;
-        height: parent.height;
-        background: #00000044;
-
-        TouchArea { }
-
-        Rectangle {
-            width: 360px;
-            height: 240px;
-            background: white;
-            border-radius: 8px;
+        if menu_visible: Rectangle {
+            x: menu_x;
+            y: menu_y;
+            width: 160px;
+            height: 210px;
+            background: #ffffff;
+            border-radius: 6px;
             border-width: 1px;
-            border-color: #e0e0e0;
-            clip: true;
+            border-color: #dcdcdc;
 
             VerticalLayout {
-                padding: 24px;
-                spacing: 16px;
+                padding: 4px;
+                spacing: 2px;
 
-                Text {
-                    text: "Edit Node Properties";
-                    font-size: 16px;
-                    font-weight: 700;
-                    color: #222222;
-                }
-
-                HorizontalLayout {
-                    spacing: 16px;
+                Rectangle {
+                    background: cut-t.has-hover ? #f0f0f0 : transparent;
+                    height: 26px;
+                    border-radius: 4px;
                     Text {
-                        text: "Label:";
+                        text: "Cut";
+                        x: 8px;
                         vertical-alignment: center;
+                        height: 100%;
                         font-size: 13px;
-                        font-weight: 500;
-                        color: #555555;
-                        width: 50px;
                     }
 
-                    Rectangle {
-                        background: #f8f9fa;
-                        border-radius: 4px;
-                        border-width: 1px;
-                        border-color: #cccccc;
-                        height: 32px;
+                    Text {
+                        text: "ctrl-x";
+                        x: parent.width - self.width - 8px;
+                        vertical-alignment: center;
+                        height: 100%;
+                        font-size: 11px;
+                        color: #888888;
+                    }
 
-                        TextInput {
-                            text: root.edit_label;
-                            font-size: 13px;
-                            vertical-alignment: center;
-                            single-line: true;
+                    cut-t := TouchArea {
+                        clicked => {
+                            menu_visible = false;
+                            root.cut_selected_subgraph(root.selected_indexes);
+                        }
+                    }
+                }
 
-                            x: 8px;
-                            width: parent.width - 16px;
+                Rectangle {
+                    background: copy-t.has-hover ? #f0f0f0 : transparent;
+                    height: 26px;
+                    border-radius: 4px;
+                    Text {
+                        text: "Copy";
+                        x: 8px;
+                        vertical-alignment: center;
+                        height: 100%;
+                        font-size: 13px;
+                    }
 
-                            edited => {
-                                root.edit_label = self.text;
+                    Text {
+                        text: "ctrl-c";
+                        x: parent.width - self.width - 8px;
+                        vertical-alignment: center;
+                        height: 100%;
+                        font-size: 11px;
+                        color: #888888;
+                    }
+
+                    copy-t := TouchArea {
+                        clicked => {
+
+                            debug("Copy click selected_indexes count: ", root.backup_selected_indexes.length);
+                            root.copy_selected_subgraph(root.backup_selected_indexes);
+                            menu_visible = false;
+                        }
+                    }
+                }
+
+                Rectangle {
+                    background: paste-t.has-hover ? #f0f0f0 : transparent;
+                    height: 26px;
+                    border-radius: 4px;
+                    Text {
+                        text: "Paste";
+                        x: 8px;
+                        vertical-alignment: center;
+                        height: 100%;
+                        font-size: 13px;
+                    }
+
+                    Text {
+                        text: "ctrl-v";
+                        x: parent.width - self.width - 8px;
+                        vertical-alignment: center;
+                        height: 100%;
+                        font-size: 11px;
+                        color: #888888;
+                    }
+
+                    paste-t := TouchArea {
+                        clicked => {
+                            menu_visible = false;
+
+                            root.paste_selected_subgraph(    (-root.canvas_pan_x / 1px) + 300,     (-root.canvas_pan_y / 1px) + 200);
+                        }
+                    }
+                }
+
+                Rectangle {
+                    background: del-t.has-hover ? #f0f0f0 : transparent;
+                    height: 26px;
+                    border-radius: 4px;
+                    Text {
+                        text: "Delete";
+                        x: 8px;
+                        vertical-alignment: center;
+                        height: 100%;
+                        font-size: 13px;
+                    }
+
+                    Text {
+                        text: "del";
+                        x: parent.width - self.width - 8px;
+                        vertical-alignment: center;
+                        height: 100%;
+                        font-size: 11px;
+                        color: #888888;
+                    }
+
+                    del-t := TouchArea {
+                        clicked => {
+                            menu_visible = false;
+                            if (root.selected_index != -1) {
+                                root.delete_selected_symbol();
+                            } else {
+
+                                root.delete_selected_connection();
                             }
                         }
                     }
                 }
 
-                HorizontalLayout {
-                    spacing: 16px;
+                Rectangle {
+                    height: 1px;
+                    background: #e8e8e8;
+                }
+
+                Rectangle {
+                    background: u.has-hover ? #f0f0f0 : transparent;
+                    height: 26px;
+                    border-radius: 4px;
                     Text {
-                        text: "Value:";
+                        text: "Undo";
+                        x: 8px;
                         vertical-alignment: center;
+                        height: 100%;
                         font-size: 13px;
-                        font-weight: 500;
-                        color: #555555;
-                        width: 50px;
                     }
 
-                    Rectangle {
-                        background: #f8f9fa;
-                        border-radius: 4px;
-                        border-width: 1px;
-                        border-color: #cccccc;
-                        height: 32px;
+                    Text {
+                        text: "ctrl-z";
+                        x: parent.width - self.width - 8px;
+                        vertical-alignment: center;
+                        height: 100%;
+                        font-size: 11px;
+                        color: #888888;
+                    }
 
-                        TextInput {
-                            text: root.edit_value;
-                            font-size: 13px;
-                            vertical-alignment: center;
-                            single-line: true;
-                            x: 8px;
-                            width: parent.width - 16px;
-
-                            edited => {
-                                root.edit_value = self.text;
-                            }
+                    u := TouchArea {
+                        clicked => {
+                            root.undo_action();
+                            menu_visible = false;
                         }
                     }
                 }
 
-                Rectangle { }
-
-                // --- Modal Actions ---
-            HorizontalLayout {
-                    spacing: 12px;
-                    alignment: end;
-
-                    Button {
-                        text: "Close";
-                        width: 85px;
-                        height: 32px;
-                        primary: true;
-                        clicked => {
-                            root.show_node_modal = false;
-                        }
+                Rectangle {
+                    background: r.has-hover ? #f0f0f0 : transparent;
+                    height: 26px;
+                    border-radius: 4px;
+                    Text {
+                        text: "Redo";
+                        x: 8px;
+                        vertical-alignment: center;
+                        height: 100%;
+                        font-size: 13px;
                     }
 
-                    Button {
-                        text: "Save";
-                        width: 85px;
-                        height: 32px;
-                        primary: true;
+                    Text {
+                        text: "ctrl-y";
+                        x: parent.width - self.width - 8px;
+                        vertical-alignment: center;
+                        height: 100%;
+                        font-size: 11px;
+                        color: #888888;
+                    }
+
+                    r := TouchArea {
                         clicked => {
-                            root.save_node_properties(root.editing_index, root.edit_label, root.edit_value);
-                            root.show_node_modal = false;
+                            menu_visible = false;
+                            root.redo_action();
+                        }
+                    }
+                }
+
+                Rectangle {
+                    height: 1px;
+                    background: #e8e8e8;
+                }
+
+                Rectangle {
+                    background: sel-t.has-hover ? #f0f0f0 : transparent;
+                    height: 26px;
+                    border-radius: 4px;
+                    Text {
+                        text: "Select All";
+                        x: 8px;
+                        vertical-alignment: center;
+                        height: 100%;
+                        font-size: 13px;
+                    }
+
+                    Text {
+                        text: "ctrl-a";
+                        x: parent.width - self.width - 8px;
+                        vertical-alignment: center;
+                        height: 100%;
+                        font-size: 11px;
+                        color: #888888;
+                    }
+
+                    sel-t := TouchArea {
+                        clicked => {
+                            root.select_all();
+                            root.backup_selected_indexes = root.selected_indexes;
+                            debug("Select all backup_selected_indexes count: ", root.backup_selected_indexes.length);
+
+                            menu_visible = false;
                         }
                     }
                 }
             }
         }
-    }
 
-    if (root.show_alert): Rectangle {
-        width: parent.width;
-        height: parent.height;
-        background: #00000044;
+        if (root.show_node_modal): Rectangle {
+            width: parent.width;
+            height: parent.height;
+            background: #00000044;
 
-        TouchArea { /* Blocks clicks from hitting the canvas underneath */ }
+            TouchArea { }
 
-        Rectangle {
-            width: 320px;
-            height: 180px; // Slightly increased to fit padding nicely
-        background: white;
-            border-radius: 8px;
-            border-width: 1px;
-            border-color: #dddddd;
-            clip: true;
+            Rectangle {
+                width: 360px;
+                height: 240px;
+                background: white;
+                border-radius: 8px;
+                border-width: 1px;
+                border-color: #e0e0e0;
+                clip: true;
 
-            VerticalLayout {
-                padding: 16px;
-                spacing: 12px;
+                VerticalLayout {
+                    padding: 24px;
+                    spacing: 16px;
 
-                Text {
-                    text: "Notification";
-                    font-size: 16px;
-                    font-weight: 700;
-                    color: #333333;
-                }
+                    Text {
+                        text: "Edit Node Properties";
+                        font-size: 16px;
+                        font-weight: 700;
+                        color: #222222;
+                    }
 
-                // Let the message text expand to fill the middle space
-            Text {
-                    text: root.alert_message;
-                    font-size: 14px;
-                    color: #555555;
-                    wrap: word-wrap;
-                    vertical-alignment: top;
-                }
+                    HorizontalLayout {
+                        spacing: 16px;
+                        Text {
+                            text: "Label:";
+                            vertical-alignment: center;
+                            font-size: 13px;
+                            font-weight: 500;
+                            color: #555555;
+                            width: 50px;
+                        }
 
-                // Horizontal layout forces the button to respect its own width 
-            // instead of stretching across the entire dialog width
+                        Rectangle {
+                            background: #f8f9fa;
+                            border-radius: 4px;
+                            border-width: 1px;
+                            border-color: #cccccc;
+                            height: 32px;
+
+                            TextInput {
+                                text: root.edit_label;
+                                font-size: 13px;
+                                vertical-alignment: center;
+                                single-line: true;
+
+                                x: 8px;
+                                width: parent.width - 16px;
+
+                                edited => {
+                                    root.edit_label = self.text;
+                                }
+                            }
+                        }
+                    }
+
+                    HorizontalLayout {
+                        spacing: 16px;
+                        Text {
+                            text: "Value:";
+                            vertical-alignment: center;
+                            font-size: 13px;
+                            font-weight: 500;
+                            color: #555555;
+                            width: 50px;
+                        }
+
+                        Rectangle {
+                            background: #f8f9fa;
+                            border-radius: 4px;
+                            border-width: 1px;
+                            border-color: #cccccc;
+                            height: 32px;
+
+                            TextInput {
+                                text: root.edit_value;
+                                font-size: 13px;
+                                vertical-alignment: center;
+                                single-line: true;
+                                x: 8px;
+                                width: parent.width - 16px;
+
+                                edited => {
+                                    root.edit_value = self.text;
+                                }
+                            }
+                        }
+                    }
+
+                    Rectangle { }
+
+                    // --- Modal Actions ---
             HorizontalLayout {
-                    alignment: center; // Centers the button horizontally
-                
-                Button {
-                        text: "Ok";
-                        width: 100px;  // Using a fixed size looks much cleaner on small dialogs
-                    height: 36px;
-                        primary: true; // Standard Slint way to make it pop (or style manually)
-                    
-                    clicked => {
-                            root.show_alert = false;
+                        spacing: 12px;
+                        alignment: end;
+
+                        Button {
+                            text: "Close";
+                            width: 85px;
+                            height: 32px;
+                            primary: true;
+                            clicked => {
+                                root.show_node_modal = false;
+                            }
+                        }
+
+                        Button {
+                            text: "Save";
+                            width: 85px;
+                            height: 32px;
+                            primary: true;
+                            clicked => {
+                                root.save_node_properties(root.editing_index, root.edit_label, root.edit_value);
+                                root.show_node_modal = false;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (root.show_alert): Rectangle {
+            width: parent.width;
+            height: parent.height;
+            background: #00000044;
+
+            TouchArea { }
+
+            Rectangle {
+                width: 320px;
+                height: 180px;
+                background: white;
+                border-radius: 8px;
+                border-width: 1px;
+                border-color: #dddddd;
+                clip: true;
+
+                VerticalLayout {
+                    padding: 16px;
+                    spacing: 12px;
+
+                    Text {
+                        text: "Notification";
+                        font-size: 16px;
+                        font-weight: 700;
+                        color: #333333;
+                    }
+
+                    Text {
+                        text: root.alert_message;
+                        font-size: 14px;
+                        color: #555555;
+                        wrap: word-wrap;
+                        vertical-alignment: top;
+                    }
+
+                    HorizontalLayout {
+                        alignment: center;
+
+                        Button {
+                            text: "Ok";
+                            width: 100px;
+                            primary: true;
+                            clicked => {
+                                root.show_alert = false;
+                            }
                         }
                     }
                 }
