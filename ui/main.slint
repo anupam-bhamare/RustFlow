@@ -231,6 +231,7 @@ export component AppWindow inherits Window {
     in-out property <string> edit_value: "";
     in-out property <int> editing_index: -1;
     in-out property <int> selected_index: -1;
+    in-out property <string> active_selection_mode: "";
 
     callback delete_selected_symbols([int]);
     callback select_all();
@@ -863,14 +864,15 @@ export component AppWindow inherits Window {
                                     width: 100%;
                                     height: 100%;
                                     clicked => {
-                                        if (root.backup_selected_indexes.length > 0) {
-                                            root.delete_selected_symbols(root.backup_selected_indexes);
-                                        } else {
+                                        if (root.active_selection_mode == "connection") {
                                             root.delete_selected_connection();
+                                        } else if (root.active_selection_mode == "node" && root.backup_selected_indexes.length > 0) {
+                                            root.delete_selected_symbols(root.backup_selected_indexes);
                                         }
                                         root.selected_indexes = [];
                                         root.backup_selected_indexes = [];
-                                        root.select_connection(-1);
+                                        root.active_selection_mode = "";
+                                        root.select_connection(-1);                                        
                                     }
                                 }
                             }
@@ -973,13 +975,14 @@ export component AppWindow inherits Window {
                             accept;
                         }
                         if (event.text == "d" && event.modifiers.control) {
-                            if (root.backup_selected_indexes.length > 0) {
-                                root.delete_selected_symbols(root.backup_selected_indexes);
-                            } else {
+                            if (root.active_selection_mode == "connection") {
                                 root.delete_selected_connection();
+                            } else if (root.active_selection_mode == "node" && root.backup_selected_indexes.length > 0) {
+                                root.delete_selected_symbols(root.backup_selected_indexes);
                             }
                             root.selected_indexes = [];
                             root.backup_selected_indexes = [];
+                            root.active_selection_mode = "";
                             root.select_connection(-1);
                             return EventResult.accept;
                         }
@@ -1178,6 +1181,7 @@ export component AppWindow inherits Window {
                                     if (!item.is_selected) {
                                         root.selected_index = i;
                                         root.node_clicked(i, evt.modifiers.control);
+                                        root.active_selection_mode = "node";
                                     }
                                     root.backup_selected_indexes = root.selected_indexes;
                                     active_node_index = i;
@@ -1194,6 +1198,7 @@ export component AppWindow inherits Window {
                             clicked => {
                                 root.selected_index = i;
                                 root.node_clicked(i, control-is-pressed);
+                                root.active_selection_mode = "node";
                                 root.backup_selected_indexes = root.selected_indexes;
                                 menu_visible = false;
                             }
@@ -1353,6 +1358,7 @@ export component AppWindow inherits Window {
                                             return EventResult.reject;
                                         }
                                         clicked => {
+                                            root.active_selection_mode = "connection";
                                             root.select_connection(index);
                                             root.selected_index = -1;
                                             menu_visible = false;
@@ -1382,6 +1388,7 @@ export component AppWindow inherits Window {
                                             return EventResult.reject;
                                         }
                                         clicked => {
+                                            root.active_selection_mode = "connection";
                                             root.select_connection(index);
                                             root.selected_index = -1;
                                             menu_visible = false;
@@ -1411,6 +1418,7 @@ export component AppWindow inherits Window {
                                             return EventResult.reject;
                                         }
                                         clicked => {
+                                            root.active_selection_mode = "connection";
                                             root.select_connection(index);
                                             root.selected_index = -1;
                                             menu_visible = false;
@@ -1440,6 +1448,7 @@ export component AppWindow inherits Window {
                                             return EventResult.reject;
                                         }
                                         clicked => {
+                                            root.active_selection_mode = "connection";
                                             root.select_connection(index);
                                             root.selected_index = -1;
                                             menu_visible = false;
@@ -1531,6 +1540,7 @@ export component AppWindow inherits Window {
                                             return EventResult.reject;
                                         }
                                         clicked => {
+                                            root.active_selection_mode = "connection";
                                             root.select_connection(index);
                                             root.selected_index = -1;
                                             menu_visible = false;
@@ -1560,6 +1570,7 @@ export component AppWindow inherits Window {
                                             return EventResult.reject;
                                         }
                                         clicked => {
+                                            root.active_selection_mode = "connection";
                                             root.select_connection(index);
                                             root.selected_index = -1;
                                             menu_visible = false;
@@ -1589,6 +1600,7 @@ export component AppWindow inherits Window {
                                             return EventResult.reject;
                                         }
                                         clicked => {
+                                            root.active_selection_mode = "connection";
                                             root.select_connection(index);
                                             root.selected_index = -1;
                                             menu_visible = false;
@@ -1618,6 +1630,7 @@ export component AppWindow inherits Window {
                                             return EventResult.reject;
                                         }
                                         clicked => {
+                                            root.active_selection_mode = "connection";
                                             root.select_connection(index);
                                             root.selected_index = -1;
                                             menu_visible = false;
@@ -1713,6 +1726,7 @@ export component AppWindow inherits Window {
                                         return EventResult.reject;
                                     }
                                     clicked => {
+                                        root.active_selection_mode = "connection";
                                         root.select_connection(index);
                                         root.selected_index = -1;
                                         menu_visible = false;
@@ -1742,6 +1756,7 @@ export component AppWindow inherits Window {
                                         return EventResult.reject;
                                     }
                                     clicked => {
+                                        root.active_selection_mode = "connection";
                                         root.select_connection(index);
                                         root.selected_index = -1;
                                         menu_visible = false;
@@ -1771,6 +1786,7 @@ export component AppWindow inherits Window {
                                         return EventResult.reject;
                                     }
                                     clicked => {
+                                        root.active_selection_mode = "connection";
                                         root.select_connection(index);
                                         root.selected_index = -1;
                                         menu_visible = false;
@@ -1800,6 +1816,7 @@ export component AppWindow inherits Window {
                                         return EventResult.reject;
                                     }
                                     clicked => {
+                                        root.active_selection_mode = "connection";
                                         root.select_connection(index);
                                         root.selected_index = -1;
                                         menu_visible = false;
@@ -1829,6 +1846,7 @@ export component AppWindow inherits Window {
                                         return EventResult.reject;
                                     }
                                     clicked => {
+                                        root.active_selection_mode = "connection";
                                         root.select_connection(index);
                                         root.selected_index = -1;
                                         menu_visible = false;
@@ -1924,6 +1942,7 @@ export component AppWindow inherits Window {
                                         return EventResult.reject;
                                     }
                                     clicked => {
+                                        root.active_selection_mode = "connection";
                                         root.select_connection(index);
                                         root.selected_index = -1;
                                         menu_visible = false;
@@ -1953,6 +1972,7 @@ export component AppWindow inherits Window {
                                         return EventResult.reject;
                                     }
                                     clicked => {
+                                        root.active_selection_mode = "connection";
                                         root.select_connection(index);
                                         root.selected_index = -1;
                                         menu_visible = false;
@@ -1982,6 +2002,7 @@ export component AppWindow inherits Window {
                                         return EventResult.reject;
                                     }
                                     clicked => {
+                                        root.active_selection_mode = "connection";
                                         root.select_connection(index);
                                         root.selected_index = -1;
                                         menu_visible = false;
@@ -2011,6 +2032,7 @@ export component AppWindow inherits Window {
                                         return EventResult.reject;
                                     }
                                     clicked => {
+                                        root.active_selection_mode = "connection";
                                         root.select_connection(index);
                                         root.selected_index = -1;
                                         menu_visible = false;
@@ -2040,6 +2062,7 @@ export component AppWindow inherits Window {
                                         return EventResult.reject;
                                     }
                                     clicked => {
+                                        root.active_selection_mode = "connection";
                                         root.select_connection(index);
                                         root.selected_index = -1;
                                         menu_visible = false;
@@ -2118,6 +2141,7 @@ export component AppWindow inherits Window {
                                             return EventResult.reject;
                                         }
                                         clicked => {
+                                            root.active_selection_mode = "connection";
                                             root.select_connection(index);
                                             root.selected_index = -1;
                                             menu_visible = false;
@@ -2147,6 +2171,7 @@ export component AppWindow inherits Window {
                                             return EventResult.reject;
                                         }
                                         clicked => {
+                                            root.active_selection_mode = "connection";
                                             root.select_connection(index);
                                             root.selected_index = -1;
                                             menu_visible = false;
@@ -2176,6 +2201,7 @@ export component AppWindow inherits Window {
                                             return EventResult.reject;
                                         }
                                         clicked => {
+                                            root.active_selection_mode = "connection";
                                             root.select_connection(index);
                                             root.selected_index = -1;
                                             menu_visible = false;
@@ -2314,13 +2340,14 @@ export component AppWindow inherits Window {
 
                     del-t := TouchArea {
                         clicked => {
-                            if (root.backup_selected_indexes.length > 0) {
-                                root.delete_selected_symbols(root.backup_selected_indexes);
-                            } else {
+                            if (root.active_selection_mode == "connection") {
                                 root.delete_selected_connection();
+                            } else if (root.active_selection_mode == "node" && root.backup_selected_indexes.length > 0) {
+                                root.delete_selected_symbols(root.backup_selected_indexes);
                             }
                             root.selected_indexes = [];
                             root.backup_selected_indexes = [];
+                            root.active_selection_mode = "";
                             root.select_connection(-1);
                             menu_visible = false;
                         }
