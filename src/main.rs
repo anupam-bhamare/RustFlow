@@ -86,7 +86,6 @@ fn main() -> Result<(), slint::PlatformError> {
     })
     .unwrap();
 
-
     ui.on_node_clicked(move |clicked_index, shift_pressed| {
         if let Some(ui_active) = ui_weak_select.upgrade() {
             let current_selection = ui_active.get_selected_indexes();
@@ -172,7 +171,6 @@ fn main() -> Result<(), slint::PlatformError> {
         }
 
         let total_nodes = copied_nodes.len();
-        let total_wires = copied_wires.len();
 
         *clipboard_copy.borrow_mut() = Some(SubgraphClipboard {
             nodes: copied_nodes,
@@ -756,8 +754,7 @@ fn main() -> Result<(), slint::PlatformError> {
             }
         };
 
-        save_h(); // Log history snapshot so a freshly wiped canvas step can be undone
-
+        save_h();
         let mut fresh_symbols = Vec::new();
         let mut fresh_connections = Vec::new();
 
@@ -855,7 +852,87 @@ fn main() -> Result<(), slint::PlatformError> {
             }
         }
     });
+    let delete_model = symbols_model.clone();
+    let ui_weak = ui.as_weak();
+    let save_h = save_history.clone();
 
+    ui.on_delete_selected_symbols({
+        let connections = connections.clone();
+        let delete_model = delete_model.clone();
+        let save_h = save_h.clone();
+
+        move |indexes_model| {
+            if let Some(ui) = ui_weak.upgrade() {
+                // 1. Cleanly parse indices, ignoring any -1 wrapping errors
+                let mut selected_indices: Vec<i32> =
+                    indexes_model.iter().filter(|&idx| idx >= 0).collect();
+
+                if selected_indices.is_empty() {
+                    return;
+                }
+
+                save_h(); // Log history context state data changes before removing indices
+
+                // 2. Process connections using your original logic pattern
+                for i in (0..connections.row_count()).rev() {
+                    if let Some(mut conn) = connections.row_data(i) {
+                        // Check if this wire is attached to ANY of the deleted nodes
+                        let from_deleted = selected_indices.contains(&conn.from_index);
+                        let to_deleted = selected_indices.contains(&conn.to_index);
+
+                        if from_deleted || to_deleted {
+                            connections.remove(i);
+                            println!("Removed broken connection at index {}", i);
+                        } else {
+                            let mut changed = false;
+
+                            // Instead of -= 1, count how many deleted targets are BELOW this index
+                            let shift_from = selected_indices
+                                .iter()
+                                .filter(|&&idx| conn.from_index > idx)
+                                .count() as i32;
+                            if shift_from > 0 {
+                                conn.from_index -= shift_from;
+                                changed = true;
+                            }
+
+                            let shift_to = selected_indices
+                                .iter()
+                                .filter(|&&idx| conn.to_index > idx)
+                                .count() as i32;
+                            if shift_to > 0 {
+                                conn.to_index -= shift_to;
+                                changed = true;
+                            }
+
+                            if changed {
+                                connections.set_row_data(i, conn);
+                            }
+                        }
+                    }
+                }
+
+                // 3. Sort indices in descending order to safely remove them from the model
+                selected_indices.sort_by(|a, b| b.cmp(a));
+
+                // 4. Delete the symbols from the model
+                for &index in &selected_indices {
+                    let index_usize = index as usize;
+                    if index_usize < delete_model.row_count() {
+                        delete_model.remove(index_usize);
+                        println!("Deleted symbol at index {}", index_usize);
+                    }
+                }
+
+                // 5. Reset UI selection state
+                let empty_model = std::rc::Rc::new(slint::VecModel::default()).into();
+                ui.set_selected_indexes(empty_model);
+
+                let msg = format!("Deleted {} nodes.", selected_indices.len());
+                ui.invoke_trigger_alert(msg.into());
+            }
+        }
+    });
     let clear_model = symbols_model.clone();
     let clear_connections = connections.clone();
     let save_h = save_history.clone();

@@ -232,7 +232,7 @@ export component AppWindow inherits Window {
     in-out property <int> editing_index: -1;
     in-out property <int> selected_index: -1;
 
-    callback delete_selected_symbols();
+    callback delete_selected_symbols([int]);
     callback select_all();
     callback cut_nodes();
     callback copy_selected_subgraph([int]);
@@ -863,12 +863,14 @@ export component AppWindow inherits Window {
                                     width: 100%;
                                     height: 100%;
                                     clicked => {
-                                        if (root.selected_index != -1) {
-                                            root.delete_selected_symbol();
+                                        if (root.backup_selected_indexes.length > 0) {
+                                            root.delete_selected_symbols(root.backup_selected_indexes);
                                         } else {
-
                                             root.delete_selected_connection();
                                         }
+                                        root.selected_indexes = [];
+                                        root.backup_selected_indexes = [];
+                                        root.select_connection(-1);
                                     }
                                 }
                             }
@@ -943,25 +945,21 @@ export component AppWindow inherits Window {
                         let is_modifier_pressed = event.modifiers.control || event.modifiers.meta;
                         if (is_modifier_pressed) {
                             if (event.text == "c") {
-                                debug("Keyboard shortcut Ctrl+C pressed! Selected count: ", root.selected_indexes.length);
-                                root.copy_selected_subgraph(root.selected_indexes);
+                                root.copy_selected_subgraph(root.backup_selected_indexes);
                                 return EventResult.accept;
                             }
                             if (event.text == "x") {
-                                root.cut_selected_subgraph(root.selected_indexes);
+                                root.cut_selected_subgraph(root.backup_selected_indexes);
                                 accept;
                             }
                             if (event.text == "a") {
                                 root.select_all();
+                                root.backup_selected_indexes = root.selected_indexes;
                                 return EventResult.accept;
                             }
                             if (event.text == "v") {
-
                                 root.paste_selected_subgraph(    (-root.canvas_pan_x / 1px) + 300,     (-root.canvas_pan_y / 1px) + 200);
 
-                                root.selected_index = -1;
-
-                                root.selected_indexes = [];
                                 return EventResult.accept;
                             }
                             EventResult.reject;
@@ -974,14 +972,16 @@ export component AppWindow inherits Window {
                             root.redo_action();
                             accept;
                         }
-                        if (event.text == Key.Delete) {
-                            if (root.selected_index != -1) {
-                                root.delete_selected_symbol();
-                                accept;
+                        if (event.text == "d" && event.modifiers.control) {
+                            if (root.backup_selected_indexes.length > 0) {
+                                root.delete_selected_symbols(root.backup_selected_indexes);
                             } else {
                                 root.delete_selected_connection();
-                                accept;
                             }
+                            root.selected_indexes = [];
+                            root.backup_selected_indexes = [];
+                            root.select_connection(-1);
+                            return EventResult.accept;
                         }
                         if (root.selected_index != -1) {
                             let delta: float = event.modifiers.shift ? 1.0 : 2.0;
@@ -1169,15 +1169,15 @@ export component AppWindow inherits Window {
                             width: 100%;
                             height: 100%;
 
-                            property <bool> shift-is-pressed: false;
+                            property <bool> control-is-pressed: false;
 
                             pointer-event(evt) => {
-                                shift-is-pressed = evt.modifiers.shift;
+                                control-is-pressed = evt.modifiers.control;
 
                                 if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
                                     if (!item.is_selected) {
                                         root.selected_index = i;
-                                        root.node_clicked(i, evt.modifiers.shift);
+                                        root.node_clicked(i, evt.modifiers.control);
                                     }
                                     root.backup_selected_indexes = root.selected_indexes;
                                     active_node_index = i;
@@ -1193,7 +1193,8 @@ export component AppWindow inherits Window {
 
                             clicked => {
                                 root.selected_index = i;
-                                root.node_clicked(i, shift-is-pressed);
+                                root.node_clicked(i, control-is-pressed);
+                                root.backup_selected_indexes = root.selected_indexes;
                                 menu_visible = false;
                             }
                             double-clicked => {
@@ -2203,35 +2204,6 @@ export component AppWindow inherits Window {
                 spacing: 2px;
 
                 Rectangle {
-                    background: cut-t.has-hover ? #f0f0f0 : transparent;
-                    height: 26px;
-                    border-radius: 4px;
-                    Text {
-                        text: "Cut";
-                        x: 8px;
-                        vertical-alignment: center;
-                        height: 100%;
-                        font-size: 13px;
-                    }
-
-                    Text {
-                        text: "ctrl-x";
-                        x: parent.width - self.width - 8px;
-                        vertical-alignment: center;
-                        height: 100%;
-                        font-size: 11px;
-                        color: #888888;
-                    }
-
-                    cut-t := TouchArea {
-                        clicked => {
-                            menu_visible = false;
-                            root.cut_selected_subgraph(root.selected_indexes);
-                        }
-                    }
-                }
-
-                Rectangle {
                     background: copy-t.has-hover ? #f0f0f0 : transparent;
                     height: 26px;
                     border-radius: 4px;
@@ -2254,8 +2226,6 @@ export component AppWindow inherits Window {
 
                     copy-t := TouchArea {
                         clicked => {
-
-                            debug("Copy click selected_indexes count: ", root.backup_selected_indexes.length);
                             root.copy_selected_subgraph(root.backup_selected_indexes);
                             menu_visible = false;
                         }
@@ -2293,6 +2263,35 @@ export component AppWindow inherits Window {
                 }
 
                 Rectangle {
+                    background: cut-t.has-hover ? #f0f0f0 : transparent;
+                    height: 26px;
+                    border-radius: 4px;
+                    Text {
+                        text: "Cut";
+                        x: 8px;
+                        vertical-alignment: center;
+                        height: 100%;
+                        font-size: 13px;
+                    }
+
+                    Text {
+                        text: "ctrl-x";
+                        x: parent.width - self.width - 8px;
+                        vertical-alignment: center;
+                        height: 100%;
+                        font-size: 11px;
+                        color: #888888;
+                    }
+
+                    cut-t := TouchArea {
+                        clicked => {
+                            menu_visible = false;
+                            root.cut_selected_subgraph(root.backup_selected_indexes);
+                        }
+                    }
+                }
+
+                Rectangle {
                     background: del-t.has-hover ? #f0f0f0 : transparent;
                     height: 26px;
                     border-radius: 4px;
@@ -2305,7 +2304,7 @@ export component AppWindow inherits Window {
                     }
 
                     Text {
-                        text: "del";
+                        text: "ctrl-d";
                         x: parent.width - self.width - 8px;
                         vertical-alignment: center;
                         height: 100%;
@@ -2315,13 +2314,15 @@ export component AppWindow inherits Window {
 
                     del-t := TouchArea {
                         clicked => {
-                            menu_visible = false;
-                            if (root.selected_index != -1) {
-                                root.delete_selected_symbol();
+                            if (root.backup_selected_indexes.length > 0) {
+                                root.delete_selected_symbols(root.backup_selected_indexes);
                             } else {
-
                                 root.delete_selected_connection();
                             }
+                            root.selected_indexes = [];
+                            root.backup_selected_indexes = [];
+                            root.select_connection(-1);
+                            menu_visible = false;
                         }
                     }
                 }
@@ -2419,8 +2420,6 @@ export component AppWindow inherits Window {
                         clicked => {
                             root.select_all();
                             root.backup_selected_indexes = root.selected_indexes;
-                            debug("Select all backup_selected_indexes count: ", root.backup_selected_indexes.length);
-
                             menu_visible = false;
                         }
                     }
@@ -2524,8 +2523,7 @@ export component AppWindow inherits Window {
 
                     Rectangle { }
 
-                    // --- Modal Actions ---
-            HorizontalLayout {
+                    HorizontalLayout {
                         spacing: 12px;
                         alignment: end;
 
