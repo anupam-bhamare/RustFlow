@@ -260,12 +260,6 @@ export component AppWindow inherits Window {
     callback save_flow();
     callback load_flow();
 
-    TouchArea {
-        clicked => {
-            menu_visible = false;
-        }
-    }
-
     public function trigger_alert(msg: string) {
         root.alert_message = msg;
         root.show_alert = true;
@@ -283,11 +277,6 @@ export component AppWindow inherits Window {
                 background: #f7f7f7;
                 border-width: 1px;
                 border-color: #dcdcdc;
-                TouchArea {
-                    clicked => {
-                        menu_visible = false;
-                    }
-                }
 
                 VerticalLayout {
                     padding: 10px;
@@ -296,6 +285,13 @@ export component AppWindow inherits Window {
                     Flickable {
                         vertical-stretch: 1;
                         viewport-height: sidebar-content.min-height;
+                        TouchArea {
+                            width: 100%;
+                            height: 100%;
+                            clicked => {
+                                menu_visible = false;
+                            }
+                        }
 
                         sidebar-content := VerticalLayout {
                             alignment: start;
@@ -328,6 +324,7 @@ export component AppWindow inherits Window {
                                         root.layout_expanded = false;
                                         root.connectors_expanded = false;
                                         root.common_expanded = !was_open;
+                                        menu_visible = false;
                                     }
                                 }
                             }
@@ -393,6 +390,7 @@ export component AppWindow inherits Window {
                                         root.layout_expanded = false;
                                         root.connectors_expanded = false;
                                         root.function_expanded = !was_open;
+                                        menu_visible = false;
                                     }
                                 }
                             }
@@ -453,6 +451,7 @@ export component AppWindow inherits Window {
                                         root.layout_expanded = false;
                                         root.connectors_expanded = false;
                                         root.parser_expanded = !was_open;
+                                        menu_visible = false;
                                     }
                                 }
                             }
@@ -512,6 +511,7 @@ export component AppWindow inherits Window {
                                         root.layout_expanded = false;
                                         root.connectors_expanded = false;
                                         root.storage_expanded = !was_open;
+                                        menu_visible = false;
                                     }
                                 }
                             }
@@ -571,6 +571,7 @@ export component AppWindow inherits Window {
                                         root.layout_expanded = false;
                                         root.connectors_expanded = false;
                                         root.dashboard_expanded = !was_open;
+                                        menu_visible = false;
                                     }
                                 }
                             }
@@ -631,6 +632,7 @@ export component AppWindow inherits Window {
                                         root.layout_expanded = false;
                                         root.connectors_expanded = false;
                                         root.network_expanded = !was_open;
+                                        menu_visible = false;
                                     }
                                 }
                             }
@@ -687,6 +689,7 @@ export component AppWindow inherits Window {
                                         root.layout_expanded = false;
                                         root.connectors_expanded = false;
                                         root.actions_expanded = !was_open;
+                                        menu_visible = false;
                                     }
                                 }
                             }
@@ -754,6 +757,7 @@ export component AppWindow inherits Window {
                                         root.layout_expanded = false;
                                         root.connectors_expanded = false;
                                         root.layout_expanded = !was_open;
+                                        menu_visible = false;
                                     }
                                 }
                             }
@@ -812,8 +816,8 @@ export component AppWindow inherits Window {
                                         root.storage_expanded = false;
                                         root.parser_expanded = false;
                                         root.layout_expanded = false;
-
                                         root.connectors_expanded = !was_open;
+                                        menu_visible = false;
                                     }
                                 }
                             }
@@ -864,15 +868,16 @@ export component AppWindow inherits Window {
                                     width: 100%;
                                     height: 100%;
                                     clicked => {
+                                        menu_visible = false;
                                         if (root.active_selection_mode == "connection") {
                                             root.delete_selected_connection();
-                                        } else if (root.active_selection_mode == "node" && root.backup_selected_indexes.length > 0) {
+                                        } else if (root.active_selection_mode == "node" || root.backup_selected_indexes.length > 0) {
                                             root.delete_selected_symbols(root.backup_selected_indexes);
                                         }
                                         root.selected_indexes = [];
                                         root.backup_selected_indexes = [];
                                         root.active_selection_mode = "";
-                                        root.select_connection(-1);                                        
+                                        root.select_connection(-1);
                                     }
                                 }
                             }
@@ -885,6 +890,7 @@ export component AppWindow inherits Window {
                                     width: 100%;
                                     height: 100%;
                                     clicked => {
+                                        menu_visible = false;
                                         root.clear_canvas();
                                     }
                                 }
@@ -898,6 +904,7 @@ export component AppWindow inherits Window {
                                     width: 100%;
                                     height: 100%;
                                     clicked => {
+                                        menu_visible = false;
                                         root.save_flow();
                                     }
                                 }
@@ -911,6 +918,7 @@ export component AppWindow inherits Window {
                                     width: 100%;
                                     height: 100%;
                                     clicked => {
+                                        menu_visible = false;
                                         root.load_flow();
                                     }
                                 }
@@ -977,7 +985,7 @@ export component AppWindow inherits Window {
                         if (event.text == "d" && event.modifiers.control) {
                             if (root.active_selection_mode == "connection") {
                                 root.delete_selected_connection();
-                            } else if (root.active_selection_mode == "node" && root.backup_selected_indexes.length > 0) {
+                            } else if (root.active_selection_mode == "node" || root.backup_selected_indexes.length > 0) {
                                 root.delete_selected_symbols(root.backup_selected_indexes);
                             }
                             root.selected_indexes = [];
@@ -2342,7 +2350,7 @@ export component AppWindow inherits Window {
                         clicked => {
                             if (root.active_selection_mode == "connection") {
                                 root.delete_selected_connection();
-                            } else if (root.active_selection_mode == "node" && root.backup_selected_indexes.length > 0) {
+                            } else if (root.active_selection_mode == "node" || root.backup_selected_indexes.length > 0) {
                                 root.delete_selected_symbols(root.backup_selected_indexes);
                             }
                             root.selected_indexes = [];
