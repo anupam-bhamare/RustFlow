@@ -41,13 +41,24 @@ component NodeSymbol inherits Rectangle {
     border-radius: 4px;
 
     if (root.creation_mode == 0 || root.creation_mode == 2): Rectangle {
-        x: -5px;
-        y: 15px;
-        width: 10px;
-        height: 10px;
-        border-radius: 5px;
-        background: input_touch.has-hover ? orange : #0288d1;
-        input_touch := TouchArea {
+        x: -12px;
+        y: 0px;
+        width: 24px;
+        height: 40px;
+        background: transparent;
+
+        Rectangle {
+            x: 7px;
+            y: 15px;
+            width: 10px;
+            height: 10px;
+            border-radius: 5px;
+            background: left_touch.has-hover ? orange : #0288d1;
+        }
+
+        left_touch := TouchArea {
+            width: 100%;
+            height: 100%;
             clicked => {
                 root.port_clicked(true, "left");
             }
@@ -55,27 +66,49 @@ component NodeSymbol inherits Rectangle {
     }
 
     if (root.creation_mode == 0 || root.creation_mode == 2): Rectangle {
-        x: 115px;
-        y: 15px;
-        width: 10px;
-        height: 10px;
-        border-radius: 5px;
-        background: output_touch.has-hover ? orange : #0288d1;
-        output_touch := TouchArea {
+        x: parent.width - 12px;
+        y: 0px;
+        width: 24px;
+        height: 40px;
+        background: transparent;
+
+        Rectangle {
+            x: 7px;
+            y: 15px;
+            width: 10px;
+            height: 10px;
+            border-radius: 5px;
+            background: right_touch.has-hover ? orange : #0288d1;
+        }
+
+        right_touch := TouchArea {
+            width: 100%;
+            height: 100%;
             clicked => {
-                root.port_clicked(false,"right");
+                root.port_clicked(false, "right");
             }
         }
     }
 
     if (root.creation_mode == 1 || root.creation_mode == 2): Rectangle {
-        x: (parent.width / 2) - 5px;
-        y: -5px;
-        width: 10px;
-        height: 10px;
-        border-radius: 5px;
-        background: top_touch.has-hover ? orange : #0288d1;
+        x: 0px;
+        y: -12px;
+        width: 120px;
+        height: 24px;
+        background: transparent;
+
+        Rectangle {
+            x: (parent.width / 2) - 5px;
+            y: 7px;
+            width: 10px;
+            height: 10px;
+            border-radius: 5px;
+            background: top_touch.has-hover ? orange : #0288d1;
+        }
+
         top_touch := TouchArea {
+            width: 100%;
+            height: 100%;
             clicked => {
                 root.port_clicked(true, "top");
             }
@@ -83,15 +116,26 @@ component NodeSymbol inherits Rectangle {
     }
 
     if (root.creation_mode == 1 || root.creation_mode == 2): Rectangle {
-        x: (parent.width / 2) - 5px;
-        y: parent.height - 5px;
-        width: 10px;
-        height: 10px;
-        border-radius: 5px;
-        background: bottom_touch.has-hover ? orange : #0288d1;
+        x: 0px;
+        y: parent.height - 12px;
+        width: 120px;
+        height: 24px;
+        background: transparent;
+
+        Rectangle {
+            x: (parent.width / 2) - 5px;
+            y: 7px;
+            width: 10px;
+            height: 10px;
+            border-radius: 5px;
+            background: bottom_touch.has-hover ? orange : #0288d1;
+        }
+
         bottom_touch := TouchArea {
+            width: 100%;
+            height: 100%;
             clicked => {
-                root.port_clicked(false,"bottom");
+                root.port_clicked(false, "bottom");
             }
         }
     }
@@ -1225,491 +1269,122 @@ export component AppWindow inherits Window {
                     }
 
                     if (root.is_pasting_mode): Rectangle {
+                        background: transparent;
 
                         for ghost in root.ghost_symbols: Rectangle {
                             property <bool> is_InputConnector: ghost.node_type == "ip_connector";
                             property <bool> is_OutputConnector: ghost.node_type == "op_connector";
                             property <bool> is_connector: is_InputConnector || is_OutputConnector;
+
                             width: is_connector ? 60px : 120px;
                             height: 40px;
                             x: root.live_mouse_x + (ghost.x * 1px);
                             y: root.live_mouse_y + (ghost.y * 1px);
+
                             background: #0d6efd.with_alpha(25%);
                             border-color: #0d6efd;
                             border-width: 2px;
                             border-radius: 4px;
-                            if (is_InputConnector): InputConnectorSymbol {
-                                width: parent.width;
-                                height: parent.height;
-                                label: ghost.label;
-                            }
-                            if (is_OutputConnector): OutputConnectorSymbol {
-                                width: parent.width;
-                                height: parent.height;
-                                label: ghost.label;
-                            }
-                            if (!is_connector): NodeSymbol {
-                                width: parent.width;
-                                height: parent.height;
-                                label: ghost.label;
-                                creation_mode: ghost.creation_mode;
+
+                            Text {
+                                text: ghost.label;
+                                color: rgb(40, 40, 50).with_alpha(0.6);
+                                width: 100%;
+                                height: 100%;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
                             }
                         }
                     }
-                    for conn[index] in root.connections: Rectangle {
+                }
 
-                        property <bool> isOutputConnector: root.all_symbols[conn.from_index].node_type == "op_connector";
-                        property <bool> isInputConnector: root.all_symbols[conn.to_index].node_type == "ip_connector";
-                        property <float> from_hw: isOutputConnector ? 0 : 60;
-                        property <float> to_hw: isInputConnector ? 60 : 60;
-                        property <float> sx: (conn.from_port == "right") ? (root.all_symbols[conn.from_index].x + from_hw) : (conn.from_port == "left") ? (root.all_symbols[conn.from_index].x - from_hw) : (root.all_symbols[conn.from_index].x);
-                        property <float> sy: (conn.from_port == "right" || conn.from_port == "left") ? (root.all_symbols[conn.from_index].y) : (conn.from_port == "bottom") ? (root.all_symbols[conn.from_index].y + 20) : (root.all_symbols[conn.from_index].y - 20);
-                        property <float> tx: (conn.to_port == "right") ? (root.all_symbols[conn.to_index].x + to_hw) : (conn.to_port == "left") ? (root.all_symbols[conn.to_index].x - to_hw) : (root.all_symbols[conn.to_index].x);
-                        property <float> ty: (conn.to_port == "right" || conn.to_port == "left") ? (root.all_symbols[conn.to_index].y) : (conn.to_port == "bottom") ? (root.all_symbols[conn.to_index].y + 20) : (root.all_symbols[conn.to_index].y - 20);
+                for conn[index] in root.connections: Rectangle {
 
-                        property <float> left: Math.min(sx, tx);
-                        property <float> top: Math.min(sy, ty);
-                        property <float> pad: 40;
+                    property <bool> isOutputConnector: root.all_symbols[conn.from_index].node_type == "op_connector";
+                    property <bool> isInputConnector: root.all_symbols[conn.to_index].node_type == "ip_connector";
+                    property <float> from_hw: isOutputConnector ? 0 : 60;
+                    property <float> to_hw: isInputConnector ? 60 : 60;
+                    property <float> sx: (conn.from_port == "right") ? (root.all_symbols[conn.from_index].x + from_hw) : (conn.from_port == "left") ? (root.all_symbols[conn.from_index].x - from_hw) : (root.all_symbols[conn.from_index].x);
+                    property <float> sy: (conn.from_port == "right" || conn.from_port == "left") ? (root.all_symbols[conn.from_index].y) : (conn.from_port == "bottom") ? (root.all_symbols[conn.from_index].y + 20) : (root.all_symbols[conn.from_index].y - 20);
+                    property <float> tx: (conn.to_port == "right") ? (root.all_symbols[conn.to_index].x + to_hw) : (conn.to_port == "left") ? (root.all_symbols[conn.to_index].x - to_hw) : (root.all_symbols[conn.to_index].x);
+                    property <float> ty: (conn.to_port == "right" || conn.to_port == "left") ? (root.all_symbols[conn.to_index].y) : (conn.to_port == "bottom") ? (root.all_symbols[conn.to_index].y + 20) : (root.all_symbols[conn.to_index].y - 20);
+
+                    property <float> left: Math.min(sx, tx);
+                    property <float> top: Math.min(sy, ty);
+                    property <float> pad: 40;
+
+                    property <bool> is_target_above: ty < sy;
+
+                    property <float> pw: Math.max(Math.abs(tx - sx), 1) + (pad * 2);
+                    property <float> ph: (Math.max(Math.abs(ty - sy), 1) + (pad * 2)) + (is_target_above ? 40 : 0);
+
+                    x: (left - pad) * 1px + root.canvas_pan_x;
+                    y: (top - pad) * 1px + root.canvas_pan_y;
+                    width: pw * 1px;
+                    height: ph * 1px;
+                    background: transparent;
+                    z: 1;
+
+                    Rectangle {
+                        property <float> local_sx: (sx - left + pad) + 3;
+                        property <float> local_sy: sy - top + pad;
+                        property <float> local_tx: tx - left + pad;
+                        property <float> local_ty: (ty - top + pad) - 2;
+
+                        property <float> center_offset: -2;
+                        property <float> adjusted_sy: local_sy + center_offset + 2;
 
                         property <bool> is_target_above: ty < sy;
+                        property <bool> is_target_left: tx < sx;
+                        property <bool> is_straight_vertical: Math.abs(local_sx - local_tx) < 2;
 
-                        property <float> pw: Math.max(Math.abs(tx - sx), 1) + (pad * 2);
-                        property <float> ph: (Math.max(Math.abs(ty - sy), 1) + (pad * 2)) + (is_target_above ? 40 : 0);
+                        property <float> wp_x1: is_straight_vertical ? local_tx : (local_sx + 25);
 
-                        x: (left - pad) * 1px + root.canvas_pan_x;
-                        y: (top - pad) * 1px + root.canvas_pan_y;
-                        width: pw * 1px;
-                        height: ph * 1px;
-                        background: transparent;
-                        z: 1;
+                        property <float> wp_y1: is_straight_vertical ? local_ty : (is_target_left ? (is_target_above ? (local_ty - 30) : (local_sy + 40)) : (is_target_above ? (local_ty - 30) : (adjusted_sy + (local_ty - adjusted_sy) / 2)));
 
-                        Rectangle {
-                            property <float> local_sx: sx - left + pad;
-                            property <float> local_sy: sy - top + pad;
-                            property <float> local_tx: tx - left + pad;
-                            property <float> local_ty: ty - top + pad;
+                        property <float> wp_x2: local_tx + 1;
+                        property <float> thick: 16.0;
 
-                            property <float> center_offset: -2;
-                            property <float> adjusted_sy: local_sy + center_offset + 2;
+                        Path {
+                            visible: (conn.from_port == "right" && conn.to_port == "top");
+                            width: parent.width;
+                            height: parent.height;
+                            viewbox-x: 0;
+                            viewbox-y: 0;
+                            viewbox-width: pw;
+                            viewbox-height: ph;
+                            fill: transparent;
+                            stroke: orange;
+                            stroke-width: conn.selected ? 3px : 2px;
 
-                            property <bool> is_target_above: ty < sy;
-                            property <bool> is_target_left: tx < sx;
-                            property <bool> is_straight_vertical: Math.abs(local_sx - local_tx) < 2;
-
-                            property <float> wp_x1: is_straight_vertical ? local_tx : (local_sx + 25);
-
-                            property <float> wp_y1: is_straight_vertical ? local_ty : (is_target_left ? (is_target_above ? (local_ty - 30) : (local_sy + 40)) : (is_target_above ? (local_ty - 30) : (adjusted_sy + (local_ty - adjusted_sy) / 2)));
-
-                            property <float> wp_x2: local_tx + 1;
-                            property <float> thick: 16.0;
-
-                            Path {
-                                visible: (conn.from_port == "right" && conn.to_port == "top");
-                                width: parent.width;
-                                height: parent.height;
-                                viewbox-x: 0;
-                                viewbox-y: 0;
-                                viewbox-width: pw;
-                                viewbox-height: ph;
-                                fill: transparent;
-                                stroke: orange;
-                                stroke-width: conn.selected ? 3px : 2px;
-
-                                MoveTo {
-                                    x: local_sx;
-                                    y: adjusted_sy;
-                                }
-
-                                LineTo {
-                                    x: wp_x1;
-                                    y: adjusted_sy;
-                                }
-
-                                LineTo {
-                                    x: wp_x1;
-                                    y: wp_y1;
-                                }
-
-                                LineTo {
-                                    x: wp_x2;
-                                    y: wp_y1;
-                                }
-
-                                LineTo {
-                                    x: wp_x2;
-                                    y: local_ty;
-                                }
+                            MoveTo {
+                                x: local_sx;
+                                y: adjusted_sy;
                             }
 
-                            if (conn.from_port == "right" && conn.to_port == "top"): Rectangle {
-                                background: transparent;
+                            LineTo {
+                                x: wp_x1;
+                                y: adjusted_sy;
+                            }
 
-                                Rectangle {
-                                    x: Math.min(local_sx, wp_x1) * 1px;
-                                    y: adjusted_sy * 1px - (thick / 2) * 1px;
-                                    width: (Math.abs(wp_x1 - local_sx) + 1.0) * 1px;
-                                    height: thick * 1px;
-                                    background: transparent;
-                                    TouchArea {
-                                        pointer-event(evt) => {
-                                            if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
-                                                root.select_connection(index);
-                                                root.selected_index = -1;
-                                                active_node_index = index;
+                            LineTo {
+                                x: wp_x1;
+                                y: wp_y1;
+                            }
 
-                                                menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
-                                                menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
+                            LineTo {
+                                x: wp_x2;
+                                y: wp_y1;
+                            }
 
-                                                menu_visible = true;
-                                                return EventResult.accept;
-                                            }
-                                            return EventResult.reject;
-                                        }
-                                        clicked => {
-                                            root.active_selection_mode = "connection";
-                                            root.select_connection(index);
-                                            root.selected_index = -1;
-                                            menu_visible = false;
-                                        }
-                                    }
-                                }
-
-                                Rectangle {
-                                    x: wp_x1 * 1px - (thick / 2) * 1px;
-                                    y: Math.min(adjusted_sy, wp_y1) * 1px;
-                                    width: thick * 1px;
-                                    height: (Math.abs(wp_y1 - adjusted_sy) + 1.0) * 1px;
-                                    background: transparent;
-                                    TouchArea {
-                                        pointer-event(evt) => {
-                                            if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
-                                                root.select_connection(index);
-                                                root.selected_index = -1;
-                                                active_node_index = index;
-
-                                                menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
-                                                menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
-
-                                                menu_visible = true;
-                                                return EventResult.accept;
-                                            }
-                                            return EventResult.reject;
-                                        }
-                                        clicked => {
-                                            root.active_selection_mode = "connection";
-                                            root.select_connection(index);
-                                            root.selected_index = -1;
-                                            menu_visible = false;
-                                        }
-                                    }
-                                }
-
-                                Rectangle {
-                                    x: Math.min(wp_x1, wp_x2) * 1px;
-                                    y: wp_y1 * 1px - (thick / 2) * 1px;
-                                    width: (Math.abs(wp_x2 - wp_x1) + 1.0) * 1px;
-                                    height: thick * 1px;
-                                    background: transparent;
-                                    TouchArea {
-                                        pointer-event(evt) => {
-                                            if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
-                                                root.select_connection(index);
-                                                root.selected_index = -1;
-                                                active_node_index = index;
-
-                                                menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
-                                                menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
-
-                                                menu_visible = true;
-                                                return EventResult.accept;
-                                            }
-                                            return EventResult.reject;
-                                        }
-                                        clicked => {
-                                            root.active_selection_mode = "connection";
-                                            root.select_connection(index);
-                                            root.selected_index = -1;
-                                            menu_visible = false;
-                                        }
-                                    }
-                                }
-
-                                Rectangle {
-                                    x: wp_x2 * 1px - (thick / 2) * 1px;
-                                    y: Math.min(wp_y1, local_ty) * 1px;
-                                    width: thick * 1px;
-                                    height: (Math.abs(local_ty - wp_y1) + 1.0) * 1px;
-                                    background: transparent;
-                                    TouchArea {
-                                        pointer-event(evt) => {
-                                            if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
-                                                root.select_connection(index);
-                                                root.selected_index = -1;
-                                                active_node_index = index;
-
-                                                menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
-                                                menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
-
-                                                menu_visible = true;
-                                                return EventResult.accept;
-                                            }
-                                            return EventResult.reject;
-                                        }
-                                        clicked => {
-                                            root.active_selection_mode = "connection";
-                                            root.select_connection(index);
-                                            root.selected_index = -1;
-                                            menu_visible = false;
-                                        }
-                                    }
-                                }
+                            LineTo {
+                                x: wp_x2;
+                                y: local_ty;
                             }
                         }
 
-                        Rectangle {
-
-                            property <bool> is_forward: tx >= sx;
-                            property <float> local_sx: (sx - left + pad) + 1;
-                            property <float> local_sy: sy - top + pad;
-                            property <float> local_tx: tx - left + pad;
-                            property <float> local_ty: ty - top + pad - 2;
-                            property <float> center_offset: -2;
-                            property <float> adjusted_sy: local_sy + center_offset;
-                            property <float> adjusted_ty: local_ty + center_offset + 2;
-
-                            property <bool> is_straight_line: Math.abs(local_sx - local_tx) < 2;
-
-                            property <float> wp_y1: is_straight_line ? adjusted_ty : (local_sy + 40);
-                            property <float> wp_x: is_straight_line ? local_tx : (local_tx - 40);
-                            property <float> target_y: is_straight_line ? adjusted_ty : (adjusted_ty + 1);
-
-                            property <float> thick: 16.0;
-
-                            Path {
-                                visible: (conn.from_port == "bottom" && conn.to_port == "left");
-                                width: parent.width;
-                                height: parent.height;
-                                viewbox-x: 0;
-                                viewbox-y: 0;
-                                viewbox-width: pw;
-                                viewbox-height: ph;
-                                fill: transparent;
-                                stroke: orange;
-                                stroke-width: conn.selected ? 3px : 2px;
-
-                                MoveTo {
-                                    x: local_sx;
-                                    y: local_sy;
-                                }
-
-                                LineTo {
-                                    x: local_sx;
-                                    y: wp_y1;
-                                }
-
-                                LineTo {
-                                    x: wp_x;
-                                    y: wp_y1;
-                                }
-
-                                LineTo {
-                                    x: wp_x;
-                                    y: is_straight_line ? adjusted_ty : (adjusted_ty + 1);
-                                }
-
-                                LineTo {
-                                    x: local_tx;
-                                    y: is_straight_line ? adjusted_ty : (adjusted_ty + 1);
-                                }
-                            }
-
-                            if (conn.from_port == "bottom" && conn.to_port == "left"): Rectangle {
-                                background: transparent;
-
-                                Rectangle {
-                                    x: local_sx * 1px - (thick / 2) * 1px;
-                                    y: Math.min(local_sy, wp_y1) * 1px;
-                                    width: thick * 1px;
-                                    height: (Math.abs(wp_y1 - local_sy) + 1.0) * 1px;
-                                    background: transparent;
-                                    TouchArea {
-                                        pointer-event(evt) => {
-                                            if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
-                                                root.select_connection(index);
-                                                root.selected_index = -1;
-                                                active_node_index = index;
-
-                                                menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
-                                                menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
-
-                                                menu_visible = true;
-                                                return EventResult.accept;
-                                            }
-                                            return EventResult.reject;
-                                        }
-                                        clicked => {
-                                            root.active_selection_mode = "connection";
-                                            root.select_connection(index);
-                                            root.selected_index = -1;
-                                            menu_visible = false;
-                                        }
-                                    }
-                                }
-
-                                Rectangle {
-                                    x: Math.min(local_sx, wp_x) * 1px;
-                                    y: wp_y1 * 1px - (thick / 2) * 1px;
-                                    width: (Math.abs(wp_x - local_sx) + 1.0) * 1px;
-                                    height: thick * 1px;
-                                    background: transparent;
-                                    TouchArea {
-                                        pointer-event(evt) => {
-                                            if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
-                                                root.select_connection(index);
-                                                root.selected_index = -1;
-                                                active_node_index = index;
-
-                                                menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
-                                                menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
-
-                                                menu_visible = true;
-                                                return EventResult.accept;
-                                            }
-                                            return EventResult.reject;
-                                        }
-                                        clicked => {
-                                            root.active_selection_mode = "connection";
-                                            root.select_connection(index);
-                                            root.selected_index = -1;
-                                            menu_visible = false;
-                                        }
-                                    }
-                                }
-
-                                Rectangle {
-                                    x: wp_x * 1px - (thick / 2) * 1px;
-                                    y: Math.min(wp_y1, target_y) * 1px;
-                                    width: thick * 1px;
-                                    height: (Math.abs(target_y - wp_y1) + 1.0) * 1px;
-                                    background: transparent;
-                                    TouchArea {
-                                        pointer-event(evt) => {
-                                            if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
-                                                root.select_connection(index);
-                                                root.selected_index = -1;
-                                                active_node_index = index;
-
-                                                menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
-                                                menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
-
-                                                menu_visible = true;
-                                                return EventResult.accept;
-                                            }
-                                            return EventResult.reject;
-                                        }
-                                        clicked => {
-                                            root.active_selection_mode = "connection";
-                                            root.select_connection(index);
-                                            root.selected_index = -1;
-                                            menu_visible = false;
-                                        }
-                                    }
-                                }
-
-                                Rectangle {
-                                    x: Math.min(wp_x, local_tx) * 1px;
-                                    y: target_y * 1px - (thick / 2) * 1px;
-                                    width: (Math.abs(local_tx - wp_x) + 1.0) * 1px;
-                                    height: thick * 1px;
-                                    background: transparent;
-                                    TouchArea {
-                                        pointer-event(evt) => {
-                                            if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
-                                                root.select_connection(index);
-                                                root.selected_index = -1;
-                                                active_node_index = index;
-
-                                                menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
-                                                menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
-
-                                                menu_visible = true;
-                                                return EventResult.accept;
-                                            }
-                                            return EventResult.reject;
-                                        }
-                                        clicked => {
-                                            root.active_selection_mode = "connection";
-                                            root.select_connection(index);
-                                            root.selected_index = -1;
-                                            menu_visible = false;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        Rectangle {
-
-                            property <bool> is_forward: tx >= sx;
-                            property <float> local_sx: sx - left + pad;
-                            property <float> local_sy: sy - top + pad;
-                            property <float> local_tx: tx - left + pad;
-                            property <float> local_ty: ty - top + pad;
-                            property <float> center_offset: -2;
-                            property <float> adjusted_sy: local_sy + center_offset + 2;
-                            property <float> adjusted_ty: local_ty + center_offset + 2;
-                            property <bool> is_mixed_route: (conn.from_port == "right" || conn.from_port == "left") && (conn.to_port == "top" || conn.to_port == "bottom");
-                            property <bool> is_straight_line: Math.abs(adjusted_sy - adjusted_ty) < 2;
-
-                            property <float> wp_x1: is_mixed_route ? (local_sx + 40) : (is_forward ? (local_sx + (local_tx - local_sx) / 2) : (local_sx + 40));
-                            property <float> wp_y: is_straight_line ? adjusted_sy : (is_mixed_route ? (adjusted_sy + (adjusted_ty - adjusted_sy) / 2) : (is_forward ? adjusted_ty : (adjusted_sy + (adjusted_ty - adjusted_sy) / 2)));
-                            property <float> wp_x2: is_mixed_route ? local_tx : (is_forward ? (local_sx + (local_tx - local_sx) / 2) : (local_tx - 40));
-
-                            property <float> thick: 16.0;
-                            property <float> seg45_y: is_straight_line ? adjusted_sy : adjusted_ty;
-
-                            Path {
-                                visible: (conn.from_port == "right" && conn.to_port == "left");
-                                width: parent.width;
-                                height: parent.height;
-                                viewbox-x: 0;
-                                viewbox-y: 0;
-                                viewbox-width: pw;
-                                viewbox-height: ph;
-                                fill: transparent;
-                                stroke: orange;
-                                stroke-width: conn.selected ? 3px : 2px;
-
-                                MoveTo {
-                                    x: local_sx;
-                                    y: adjusted_sy;
-                                }
-
-                                LineTo {
-                                    x: wp_x1;
-                                    y: adjusted_sy;
-                                }
-
-                                LineTo {
-                                    x: wp_x1;
-                                    y: wp_y;
-                                }
-
-                                LineTo {
-                                    x: wp_x2;
-                                    y: wp_y;
-                                }
-
-                                LineTo {
-                                    x: wp_x2;
-                                    y: is_straight_line ? adjusted_sy : adjusted_ty;
-                                }
-
-                                LineTo {
-                                    x: local_tx;
-                                    y: is_straight_line ? adjusted_sy : adjusted_ty;
-                                }
-                            }
+                        if (conn.from_port == "right" && conn.to_port == "top"): Rectangle {
+                            background: transparent;
 
                             Rectangle {
                                 x: Math.min(local_sx, wp_x1) * 1px;
@@ -1717,7 +1392,6 @@ export component AppWindow inherits Window {
                                 width: (Math.abs(wp_x1 - local_sx) + 1.0) * 1px;
                                 height: thick * 1px;
                                 background: transparent;
-
                                 TouchArea {
                                     pointer-event(evt) => {
                                         if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
@@ -1744,9 +1418,9 @@ export component AppWindow inherits Window {
 
                             Rectangle {
                                 x: wp_x1 * 1px - (thick / 2) * 1px;
-                                y: Math.min(adjusted_sy, wp_y) * 1px;
+                                y: Math.min(adjusted_sy, wp_y1) * 1px;
                                 width: thick * 1px;
-                                height: (Math.abs(wp_y - adjusted_sy) + 1.0) * 1px;
+                                height: (Math.abs(wp_y1 - adjusted_sy) + 1.0) * 1px;
                                 background: transparent;
                                 TouchArea {
                                     pointer-event(evt) => {
@@ -1774,7 +1448,7 @@ export component AppWindow inherits Window {
 
                             Rectangle {
                                 x: Math.min(wp_x1, wp_x2) * 1px;
-                                y: wp_y * 1px - (thick / 2) * 1px;
+                                y: wp_y1 * 1px - (thick / 2) * 1px;
                                 width: (Math.abs(wp_x2 - wp_x1) + 1.0) * 1px;
                                 height: thick * 1px;
                                 background: transparent;
@@ -1804,39 +1478,9 @@ export component AppWindow inherits Window {
 
                             Rectangle {
                                 x: wp_x2 * 1px - (thick / 2) * 1px;
-                                y: Math.min(wp_y, seg45_y) * 1px;
+                                y: Math.min(wp_y1, local_ty) * 1px;
                                 width: thick * 1px;
-                                height: (Math.abs(seg45_y - wp_y) + 1.0) * 1px;
-                                background: transparent;
-                                TouchArea {
-                                    pointer-event(evt) => {
-                                        if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
-                                            root.select_connection(index);
-                                            root.selected_index = -1;
-                                            active_node_index = index;
-
-                                            menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
-                                            menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
-
-                                            menu_visible = true;
-                                            return EventResult.accept;
-                                        }
-                                        return EventResult.reject;
-                                    }
-                                    clicked => {
-                                        root.active_selection_mode = "connection";
-                                        root.select_connection(index);
-                                        root.selected_index = -1;
-                                        menu_visible = false;
-                                    }
-                                }
-                            }
-
-                            Rectangle {
-                                x: Math.min(wp_x2, local_tx) * 1px;
-                                y: seg45_y * 1px - (thick / 2) * 1px;
-                                width: (Math.abs(local_tx - wp_x2) + 1.0) * 1px;
-                                height: thick * 1px;
+                                height: (Math.abs(local_ty - wp_y1) + 1.0) * 1px;
                                 background: transparent;
                                 TouchArea {
                                     pointer-event(evt) => {
@@ -1862,74 +1506,70 @@ export component AppWindow inherits Window {
                                 }
                             }
                         }
+                    }
 
-                        Rectangle {
+                    Rectangle {
 
-                            property <float> local_sx: sx - left + pad;
-                            property <float> local_sy: sy - top + pad;
-                            property <float> local_tx: tx - left + pad;
-                            property <float> local_ty: ty - top + pad;
+                        property <bool> is_forward: tx >= sx;
+                        property <float> local_sx: (sx - left + pad) + 2;
+                        property <float> local_sy: sy - top + pad + 3;
+                        property <float> local_tx: tx - left + pad - 3;
+                        property <float> local_ty: ty - top + pad - 2;
+                        property <float> center_offset: -2;
+                        property <float> adjusted_sy: local_sy + center_offset;
+                        property <float> adjusted_ty: local_ty + center_offset + 2;
 
-                            property <float> adjusted_sx: local_sx;
-                            property <float> adjusted_tx: local_tx;
-                            property <float> adjusted_ty: local_ty;
+                        property <bool> is_straight_line: Math.abs(local_sx - local_tx) < 2;
 
-                            property <bool> is_straight_vertical: Math.abs(adjusted_sx - adjusted_tx) < 2;
-                            property <bool> is_target_above: ty < sy;
+                        property <float> wp_y1: is_straight_line ? adjusted_ty : (local_sy + 40);
+                        property <float> wp_x: is_straight_line ? local_tx : (local_tx - 40);
+                        property <float> target_y: is_straight_line ? adjusted_ty : (adjusted_ty + 1);
 
-                            property <float> wp_y1: is_straight_vertical ? adjusted_ty : (is_target_above ? (local_sy + 40) : (local_sy + (adjusted_ty - local_sy) / 2));
-                            property <float> side_offset: (is_straight_vertical || !is_target_above) ? 0 : 90;
-                            property <float> approach_offset: (is_straight_vertical || !is_target_above) ? 0 : -30;
+                        property <float> thick: 16.0;
 
-                            property <float> seg23_x: is_straight_vertical ? adjusted_tx : (adjusted_tx + side_offset);
-                            property <float> seg34_y: is_straight_vertical ? adjusted_ty : (adjusted_ty + approach_offset);
-                            property <float> thick: 16.0;
+                        Path {
+                            visible: (conn.from_port == "bottom" && conn.to_port == "left");
+                            width: parent.width;
+                            height: parent.height;
+                            viewbox-x: 0;
+                            viewbox-y: 0;
+                            viewbox-width: pw;
+                            viewbox-height: ph;
+                            fill: transparent;
+                            stroke: orange;
+                            stroke-width: conn.selected ? 3px : 2px;
 
-                            Path {
-                                visible: (conn.from_port == "bottom" && conn.to_port == "top");
-                                width: parent.width;
-                                height: parent.height;
-                                viewbox-x: 0;
-                                viewbox-y: 0;
-                                viewbox-width: pw;
-                                viewbox-height: ph;
-                                fill: transparent;
-                                stroke: orange;
-                                stroke-width: conn.selected ? 3px : 2px;
-
-                                MoveTo {
-                                    x: adjusted_sx;
-                                    y: local_sy;
-                                }
-
-                                LineTo {
-                                    x: adjusted_sx;
-                                    y: wp_y1;
-                                }
-
-                                LineTo {
-                                    x: seg23_x;
-                                    y: wp_y1;
-                                }
-
-                                LineTo {
-                                    x: seg23_x;
-                                    y: seg34_y;
-                                }
-
-                                LineTo {
-                                    x: adjusted_tx;
-                                    y: seg34_y;
-                                }
-
-                                LineTo {
-                                    x: adjusted_tx;
-                                    y: adjusted_ty;
-                                }
+                            MoveTo {
+                                x: local_sx;
+                                y: local_sy;
                             }
 
+                            LineTo {
+                                x: local_sx;
+                                y: wp_y1;
+                            }
+
+                            LineTo {
+                                x: wp_x;
+                                y: wp_y1;
+                            }
+
+                            LineTo {
+                                x: wp_x;
+                                y: is_straight_line ? adjusted_ty : (adjusted_ty + 1);
+                            }
+
+                            LineTo {
+                                x: local_tx;
+                                y: is_straight_line ? adjusted_ty : (adjusted_ty + 1);
+                            }
+                        }
+
+                        if (conn.from_port == "bottom" && conn.to_port == "left"): Rectangle {
+                            background: transparent;
+
                             Rectangle {
-                                x: adjusted_sx * 1px - (thick / 2) * 1px;
+                                x: local_sx * 1px - (thick / 2) * 1px;
                                 y: Math.min(local_sy, wp_y1) * 1px;
                                 width: thick * 1px;
                                 height: (Math.abs(wp_y1 - local_sy) + 1.0) * 1px;
@@ -1959,9 +1599,9 @@ export component AppWindow inherits Window {
                             }
 
                             Rectangle {
-                                x: Math.min(adjusted_sx, seg23_x) * 1px;
+                                x: Math.min(local_sx, wp_x) * 1px;
                                 y: wp_y1 * 1px - (thick / 2) * 1px;
-                                width: (Math.abs(seg23_x - adjusted_sx) + 1.0) * 1px;
+                                width: (Math.abs(wp_x - local_sx) + 1.0) * 1px;
                                 height: thick * 1px;
                                 background: transparent;
                                 TouchArea {
@@ -1989,10 +1629,10 @@ export component AppWindow inherits Window {
                             }
 
                             Rectangle {
-                                x: seg23_x * 1px - (thick / 2) * 1px;
-                                y: Math.min(wp_y1, seg34_y) * 1px;
+                                x: wp_x * 1px - (thick / 2) * 1px;
+                                y: Math.min(wp_y1, target_y) * 1px;
                                 width: thick * 1px;
-                                height: (Math.abs(seg34_y - wp_y1) + 1.0) * 1px;
+                                height: (Math.abs(target_y - wp_y1) + 1.0) * 1px;
                                 background: transparent;
                                 TouchArea {
                                     pointer-event(evt) => {
@@ -2019,40 +1659,10 @@ export component AppWindow inherits Window {
                             }
 
                             Rectangle {
-                                x: Math.min(seg23_x, adjusted_tx) * 1px;
-                                y: seg34_y * 1px - (thick / 2) * 1px;
-                                width: (Math.abs(adjusted_tx - seg23_x) + 1.0) * 1px;
+                                x: Math.min(wp_x, local_tx) * 1px;
+                                y: target_y * 1px - (thick / 2) * 1px;
+                                width: (Math.abs(local_tx - wp_x) + 1.0) * 1px;
                                 height: thick * 1px;
-                                background: transparent;
-                                TouchArea {
-                                    pointer-event(evt) => {
-                                        if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
-                                            root.select_connection(index);
-                                            root.selected_index = -1;
-                                            active_node_index = index;
-
-                                            menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
-                                            menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
-
-                                            menu_visible = true;
-                                            return EventResult.accept;
-                                        }
-                                        return EventResult.reject;
-                                    }
-                                    clicked => {
-                                        root.active_selection_mode = "connection";
-                                        root.select_connection(index);
-                                        root.selected_index = -1;
-                                        menu_visible = false;
-                                    }
-                                }
-                            }
-
-                            Rectangle {
-                                x: adjusted_tx * 1px - (thick / 2) * 1px;
-                                y: Math.min(seg34_y, adjusted_ty) * 1px;
-                                width: thick * 1px;
-                                height: (Math.abs(adjusted_ty - seg34_y) + 1.0) * 1px;
                                 background: transparent;
                                 TouchArea {
                                     pointer-event(evt) => {
@@ -2078,142 +1688,573 @@ export component AppWindow inherits Window {
                                 }
                             }
                         }
+                    }
+
+                    Rectangle {
+
+                        property <bool> is_forward: tx >= sx;
+                        property <float> local_sx: (sx - left + pad) + 4;
+                        property <float> local_sy: sy - top + pad;
+                        property <float> local_tx: (tx - left + pad) - 4;
+                        property <float> local_ty: ty - top + pad;
+                        property <float> center_offset: -2;
+                        property <float> adjusted_sy: local_sy + center_offset + 2;
+                        property <float> adjusted_ty: local_ty + center_offset + 2;
+                        property <bool> is_mixed_route: (conn.from_port == "right" || conn.from_port == "left") && (conn.to_port == "top" || conn.to_port == "bottom");
+                        property <bool> is_straight_line: Math.abs(adjusted_sy - adjusted_ty) < 2;
+
+                        property <float> wp_x1: is_mixed_route ? (local_sx + 40) : (is_forward ? (local_sx + (local_tx - local_sx) / 2) : (local_sx + 40));
+                        property <float> wp_y: is_straight_line ? adjusted_sy : (is_mixed_route ? (adjusted_sy + (adjusted_ty - adjusted_sy) / 2) : (is_forward ? adjusted_ty : (adjusted_sy + (adjusted_ty - adjusted_sy) / 2)));
+                        property <float> wp_x2: is_mixed_route ? local_tx : (is_forward ? (local_sx + (local_tx - local_sx) / 2) : (local_tx - 40));
+
+                        property <float> thick: 16.0;
+                        property <float> seg45_y: is_straight_line ? adjusted_sy : adjusted_ty;
+
+                        Path {
+                            visible: (conn.from_port == "right" && conn.to_port == "left");
+                            width: parent.width;
+                            height: parent.height;
+                            viewbox-x: 0;
+                            viewbox-y: 0;
+                            viewbox-width: pw;
+                            viewbox-height: ph;
+                            fill: transparent;
+                            stroke: orange;
+                            stroke-width: conn.selected ? 3px : 2px;
+
+                            MoveTo {
+                                x: local_sx;
+                                y: adjusted_sy;
+                            }
+
+                            LineTo {
+                                x: wp_x1;
+                                y: adjusted_sy;
+                            }
+
+                            LineTo {
+                                x: wp_x1;
+                                y: wp_y;
+                            }
+
+                            LineTo {
+                                x: wp_x2;
+                                y: wp_y;
+                            }
+
+                            LineTo {
+                                x: wp_x2;
+                                y: is_straight_line ? adjusted_sy : adjusted_ty;
+                            }
+
+                            LineTo {
+                                x: local_tx;
+                                y: is_straight_line ? adjusted_sy : adjusted_ty;
+                            }
+                        }
 
                         Rectangle {
+                            x: Math.min(local_sx, wp_x1) * 1px;
+                            y: adjusted_sy * 1px - (thick / 2) * 1px;
+                            width: (Math.abs(wp_x1 - local_sx) + 1.0) * 1px;
+                            height: thick * 1px;
+                            background: transparent;
 
-                            property <float> local_sx: sx - left + pad;
-                            property <float> local_sy: sy - top + pad;
-                            property <float> local_tx: tx - left + pad;
-                            property <float> local_ty: ty - top + pad;
+                            TouchArea {
+                                pointer-event(evt) => {
+                                    if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
+                                        root.select_connection(index);
+                                        root.selected_index = -1;
+                                        active_node_index = index;
 
-                            property <bool> is_straight_vertical: Math.abs(local_sx - local_tx) < 2;
+                                        menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
+                                        menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
 
-                            property <float> midpoint_y: local_sy + (local_ty - local_sy) / 2;
-                            property <float> thick: 16.0;
-
-                            Path {
-                                visible: (conn.from_port == "top" && conn.to_port == "bottom");
-                                width: parent.width;
-                                height: parent.height;
-                                viewbox-x: 0;
-                                viewbox-y: 0;
-                                viewbox-width: pw;
-                                viewbox-height: ph;
-                                fill: transparent;
-                                stroke: orange;
-                                stroke-width: conn.selected ? 3px : 2px;
-
-                                MoveTo {
-                                    x: local_sx;
-                                    y: local_sy;
+                                        menu_visible = true;
+                                        return EventResult.accept;
+                                    }
+                                    return EventResult.reject;
                                 }
-
-                                LineTo {
-                                    x: local_sx;
-                                    y: midpoint_y;
+                                clicked => {
+                                    root.active_selection_mode = "connection";
+                                    root.select_connection(index);
+                                    root.selected_index = -1;
+                                    menu_visible = false;
                                 }
+                            }
+                        }
 
-                                LineTo {
-                                    x: local_tx;
-                                    y: midpoint_y;
+                        Rectangle {
+                            x: wp_x1 * 1px - (thick / 2) * 1px;
+                            y: Math.min(adjusted_sy, wp_y) * 1px;
+                            width: thick * 1px;
+                            height: (Math.abs(wp_y - adjusted_sy) + 1.0) * 1px;
+                            background: transparent;
+                            TouchArea {
+                                pointer-event(evt) => {
+                                    if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
+                                        root.select_connection(index);
+                                        root.selected_index = -1;
+                                        active_node_index = index;
+
+                                        menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
+                                        menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
+
+                                        menu_visible = true;
+                                        return EventResult.accept;
+                                    }
+                                    return EventResult.reject;
                                 }
+                                clicked => {
+                                    root.active_selection_mode = "connection";
+                                    root.select_connection(index);
+                                    root.selected_index = -1;
+                                    menu_visible = false;
+                                }
+                            }
+                        }
 
-                                LineTo {
-                                    x: local_tx;
-                                    y: local_ty;
+                        Rectangle {
+                            x: Math.min(wp_x1, wp_x2) * 1px;
+                            y: wp_y * 1px - (thick / 2) * 1px;
+                            width: (Math.abs(wp_x2 - wp_x1) + 1.0) * 1px;
+                            height: thick * 1px;
+                            background: transparent;
+                            TouchArea {
+                                pointer-event(evt) => {
+                                    if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
+                                        root.select_connection(index);
+                                        root.selected_index = -1;
+                                        active_node_index = index;
+
+                                        menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
+                                        menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
+
+                                        menu_visible = true;
+                                        return EventResult.accept;
+                                    }
+                                    return EventResult.reject;
+                                }
+                                clicked => {
+                                    root.active_selection_mode = "connection";
+                                    root.select_connection(index);
+                                    root.selected_index = -1;
+                                    menu_visible = false;
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            x: wp_x2 * 1px - (thick / 2) * 1px;
+                            y: Math.min(wp_y, seg45_y) * 1px;
+                            width: thick * 1px;
+                            height: (Math.abs(seg45_y - wp_y) + 1.0) * 1px;
+                            background: transparent;
+                            TouchArea {
+                                pointer-event(evt) => {
+                                    if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
+                                        root.select_connection(index);
+                                        root.selected_index = -1;
+                                        active_node_index = index;
+
+                                        menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
+                                        menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
+
+                                        menu_visible = true;
+                                        return EventResult.accept;
+                                    }
+                                    return EventResult.reject;
+                                }
+                                clicked => {
+                                    root.active_selection_mode = "connection";
+                                    root.select_connection(index);
+                                    root.selected_index = -1;
+                                    menu_visible = false;
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            x: Math.min(wp_x2, local_tx) * 1px;
+                            y: seg45_y * 1px - (thick / 2) * 1px;
+                            width: (Math.abs(local_tx - wp_x2) + 1.0) * 1px;
+                            height: thick * 1px;
+                            background: transparent;
+                            TouchArea {
+                                pointer-event(evt) => {
+                                    if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
+                                        root.select_connection(index);
+                                        root.selected_index = -1;
+                                        active_node_index = index;
+
+                                        menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
+                                        menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
+
+                                        menu_visible = true;
+                                        return EventResult.accept;
+                                    }
+                                    return EventResult.reject;
+                                }
+                                clicked => {
+                                    root.active_selection_mode = "connection";
+                                    root.select_connection(index);
+                                    root.selected_index = -1;
+                                    menu_visible = false;
+                                }
+                            }
+                        }
+                    }
+
+                    Rectangle {
+
+                        property <float> local_sx: sx - left + pad;
+                        property <float> local_sy: (sy - top + pad) + 3;
+                        property <float> local_tx: tx - left + pad;
+                        property <float> local_ty: (ty - top + pad) - 3;
+
+                        property <float> adjusted_sx: local_sx;
+                        property <float> adjusted_tx: local_tx;
+                        property <float> adjusted_ty: local_ty;
+
+                        property <bool> is_straight_vertical: Math.abs(adjusted_sx - adjusted_tx) < 2;
+                        property <bool> is_target_above: ty < sy;
+
+                        property <float> wp_y1: is_straight_vertical ? adjusted_ty : (is_target_above ? (local_sy + 40) : (local_sy + (adjusted_ty - local_sy) / 2));
+                        property <float> side_offset: (is_straight_vertical || !is_target_above) ? 0 : 90;
+                        property <float> approach_offset: (is_straight_vertical || !is_target_above) ? 0 : -30;
+
+                        property <float> seg23_x: is_straight_vertical ? adjusted_tx : (adjusted_tx + side_offset);
+                        property <float> seg34_y: is_straight_vertical ? adjusted_ty : (adjusted_ty + approach_offset);
+                        property <float> thick: 16.0;
+
+                        Path {
+                            visible: (conn.from_port == "bottom" && conn.to_port == "top");
+                            width: parent.width;
+                            height: parent.height;
+                            viewbox-x: 0;
+                            viewbox-y: 0;
+                            viewbox-width: pw;
+                            viewbox-height: ph;
+                            fill: transparent;
+                            stroke: orange;
+                            stroke-width: conn.selected ? 3px : 2px;
+
+                            MoveTo {
+                                x: adjusted_sx;
+                                y: local_sy;
+                            }
+
+                            LineTo {
+                                x: adjusted_sx;
+                                y: wp_y1;
+                            }
+
+                            LineTo {
+                                x: seg23_x;
+                                y: wp_y1;
+                            }
+
+                            LineTo {
+                                x: seg23_x;
+                                y: seg34_y;
+                            }
+
+                            LineTo {
+                                x: adjusted_tx;
+                                y: seg34_y;
+                            }
+
+                            LineTo {
+                                x: adjusted_tx;
+                                y: adjusted_ty;
+                            }
+                        }
+
+                        Rectangle {
+                            x: adjusted_sx * 1px - (thick / 2) * 1px;
+                            y: Math.min(local_sy, wp_y1) * 1px;
+                            width: thick * 1px;
+                            height: (Math.abs(wp_y1 - local_sy) + 1.0) * 1px;
+                            background: transparent;
+                            TouchArea {
+                                pointer-event(evt) => {
+                                    if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
+                                        root.select_connection(index);
+                                        root.selected_index = -1;
+                                        active_node_index = index;
+
+                                        menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
+                                        menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
+
+                                        menu_visible = true;
+                                        return EventResult.accept;
+                                    }
+                                    return EventResult.reject;
+                                }
+                                clicked => {
+                                    root.active_selection_mode = "connection";
+                                    root.select_connection(index);
+                                    root.selected_index = -1;
+                                    menu_visible = false;
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            x: Math.min(adjusted_sx, seg23_x) * 1px;
+                            y: wp_y1 * 1px - (thick / 2) * 1px;
+                            width: (Math.abs(seg23_x - adjusted_sx) + 1.0) * 1px;
+                            height: thick * 1px;
+                            background: transparent;
+                            TouchArea {
+                                pointer-event(evt) => {
+                                    if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
+                                        root.select_connection(index);
+                                        root.selected_index = -1;
+                                        active_node_index = index;
+
+                                        menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
+                                        menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
+
+                                        menu_visible = true;
+                                        return EventResult.accept;
+                                    }
+                                    return EventResult.reject;
+                                }
+                                clicked => {
+                                    root.active_selection_mode = "connection";
+                                    root.select_connection(index);
+                                    root.selected_index = -1;
+                                    menu_visible = false;
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            x: seg23_x * 1px - (thick / 2) * 1px;
+                            y: Math.min(wp_y1, seg34_y) * 1px;
+                            width: thick * 1px;
+                            height: (Math.abs(seg34_y - wp_y1) + 1.0) * 1px;
+                            background: transparent;
+                            TouchArea {
+                                pointer-event(evt) => {
+                                    if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
+                                        root.select_connection(index);
+                                        root.selected_index = -1;
+                                        active_node_index = index;
+
+                                        menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
+                                        menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
+
+                                        menu_visible = true;
+                                        return EventResult.accept;
+                                    }
+                                    return EventResult.reject;
+                                }
+                                clicked => {
+                                    root.active_selection_mode = "connection";
+                                    root.select_connection(index);
+                                    root.selected_index = -1;
+                                    menu_visible = false;
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            x: Math.min(seg23_x, adjusted_tx) * 1px;
+                            y: seg34_y * 1px - (thick / 2) * 1px;
+                            width: (Math.abs(adjusted_tx - seg23_x) + 1.0) * 1px;
+                            height: thick * 1px;
+                            background: transparent;
+                            TouchArea {
+                                pointer-event(evt) => {
+                                    if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
+                                        root.select_connection(index);
+                                        root.selected_index = -1;
+                                        active_node_index = index;
+
+                                        menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
+                                        menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
+
+                                        menu_visible = true;
+                                        return EventResult.accept;
+                                    }
+                                    return EventResult.reject;
+                                }
+                                clicked => {
+                                    root.active_selection_mode = "connection";
+                                    root.select_connection(index);
+                                    root.selected_index = -1;
+                                    menu_visible = false;
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            x: adjusted_tx * 1px - (thick / 2) * 1px;
+                            y: Math.min(seg34_y, adjusted_ty) * 1px;
+                            width: thick * 1px;
+                            height: (Math.abs(adjusted_ty - seg34_y) + 1.0) * 1px;
+                            background: transparent;
+                            TouchArea {
+                                pointer-event(evt) => {
+                                    if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
+                                        root.select_connection(index);
+                                        root.selected_index = -1;
+                                        active_node_index = index;
+
+                                        menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
+                                        menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
+
+                                        menu_visible = true;
+                                        return EventResult.accept;
+                                    }
+                                    return EventResult.reject;
+                                }
+                                clicked => {
+                                    root.active_selection_mode = "connection";
+                                    root.select_connection(index);
+                                    root.selected_index = -1;
+                                    menu_visible = false;
+                                }
+                            }
+                        }
+                    }
+
+                    Rectangle {
+
+                        property <float> local_sx: sx - left + pad;
+                        property <float> local_sy: sy - top + pad;
+                        property <float> local_tx: tx - left + pad;
+                        property <float> local_ty: ty - top + pad;
+
+                        property <bool> is_straight_vertical: Math.abs(local_sx - local_tx) < 2;
+
+                        property <float> midpoint_y: local_sy + (local_ty - local_sy) / 2;
+                        property <float> thick: 16.0;
+
+                        Path {
+                            visible: (conn.from_port == "top" && conn.to_port == "bottom");
+                            width: parent.width;
+                            height: parent.height;
+                            viewbox-x: 0;
+                            viewbox-y: 0;
+                            viewbox-width: pw;
+                            viewbox-height: ph;
+                            fill: transparent;
+                            stroke: orange;
+                            stroke-width: conn.selected ? 3px : 2px;
+
+                            MoveTo {
+                                x: local_sx;
+                                y: local_sy;
+                            }
+
+                            LineTo {
+                                x: local_sx;
+                                y: midpoint_y;
+                            }
+
+                            LineTo {
+                                x: local_tx;
+                                y: midpoint_y;
+                            }
+
+                            LineTo {
+                                x: local_tx;
+                                y: local_ty;
+                            }
+                        }
+
+                        if (conn.from_port == "top" && conn.to_port == "bottom"): Rectangle {
+                            background: transparent;
+
+                            Rectangle {
+                                x: local_sx * 1px - (thick / 2) * 1px;
+                                y: Math.min(local_sy, midpoint_y) * 1px;
+                                width: thick * 1px;
+                                height: (Math.abs(midpoint_y - local_sy) + 1.0) * 1px;
+                                background: transparent;
+                                TouchArea {
+                                    pointer-event(evt) => {
+                                        if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
+                                            root.select_connection(index);
+                                            root.selected_index = -1;
+                                            active_node_index = index;
+
+                                            menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
+                                            menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
+
+                                            menu_visible = true;
+                                            return EventResult.accept;
+                                        }
+                                        return EventResult.reject;
+                                    }
+                                    clicked => {
+                                        root.active_selection_mode = "connection";
+                                        root.select_connection(index);
+                                        root.selected_index = -1;
+                                        menu_visible = false;
+                                    }
                                 }
                             }
 
-                            if (conn.from_port == "top" && conn.to_port == "bottom"): Rectangle {
+                            Rectangle {
+                                x: Math.min(local_sx, local_tx) * 1px;
+                                y: midpoint_y * 1px - (thick / 2) * 1px;
+                                width: (Math.abs(local_tx - local_sx) + 1.0) * 1px;
+                                height: thick * 1px;
                                 background: transparent;
-
-                                Rectangle {
-                                    x: local_sx * 1px - (thick / 2) * 1px;
-                                    y: Math.min(local_sy, midpoint_y) * 1px;
-                                    width: thick * 1px;
-                                    height: (Math.abs(midpoint_y - local_sy) + 1.0) * 1px;
-                                    background: transparent;
-                                    TouchArea {
-                                        pointer-event(evt) => {
-                                            if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
-                                                root.select_connection(index);
-                                                root.selected_index = -1;
-                                                active_node_index = index;
-
-                                                menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
-                                                menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
-
-                                                menu_visible = true;
-                                                return EventResult.accept;
-                                            }
-                                            return EventResult.reject;
-                                        }
-                                        clicked => {
-                                            root.active_selection_mode = "connection";
+                                TouchArea {
+                                    pointer-event(evt) => {
+                                        if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
                                             root.select_connection(index);
                                             root.selected_index = -1;
-                                            menu_visible = false;
+                                            active_node_index = index;
+
+                                            menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
+                                            menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
+
+                                            menu_visible = true;
+                                            return EventResult.accept;
                                         }
+                                        return EventResult.reject;
+                                    }
+                                    clicked => {
+                                        root.active_selection_mode = "connection";
+                                        root.select_connection(index);
+                                        root.selected_index = -1;
+                                        menu_visible = false;
                                     }
                                 }
+                            }
 
-                                Rectangle {
-                                    x: Math.min(local_sx, local_tx) * 1px;
-                                    y: midpoint_y * 1px - (thick / 2) * 1px;
-                                    width: (Math.abs(local_tx - local_sx) + 1.0) * 1px;
-                                    height: thick * 1px;
-                                    background: transparent;
-                                    TouchArea {
-                                        pointer-event(evt) => {
-                                            if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
-                                                root.select_connection(index);
-                                                root.selected_index = -1;
-                                                active_node_index = index;
-
-                                                menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
-                                                menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
-
-                                                menu_visible = true;
-                                                return EventResult.accept;
-                                            }
-                                            return EventResult.reject;
-                                        }
-                                        clicked => {
-                                            root.active_selection_mode = "connection";
+                            Rectangle {
+                                x: local_tx * 1px - (thick / 2) * 1px;
+                                y: Math.min(midpoint_y, local_ty) * 1px;
+                                width: thick * 1px;
+                                height: (Math.abs(local_ty - midpoint_y) + 1.0) * 1px;
+                                background: transparent;
+                                TouchArea {
+                                    pointer-event(evt) => {
+                                        if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
                                             root.select_connection(index);
                                             root.selected_index = -1;
-                                            menu_visible = false;
+                                            active_node_index = index;
+
+                                            menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
+                                            menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
+
+                                            menu_visible = true;
+                                            return EventResult.accept;
                                         }
+                                        return EventResult.reject;
                                     }
-                                }
-
-                                Rectangle {
-                                    x: local_tx * 1px - (thick / 2) * 1px;
-                                    y: Math.min(midpoint_y, local_ty) * 1px;
-                                    width: thick * 1px;
-                                    height: (Math.abs(local_ty - midpoint_y) + 1.0) * 1px;
-                                    background: transparent;
-                                    TouchArea {
-                                        pointer-event(evt) => {
-                                            if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
-                                                root.select_connection(index);
-                                                root.selected_index = -1;
-                                                active_node_index = index;
-
-                                                menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
-                                                menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
-
-                                                menu_visible = true;
-                                                return EventResult.accept;
-                                            }
-                                            return EventResult.reject;
-                                        }
-                                        clicked => {
-                                            root.active_selection_mode = "connection";
-                                            root.select_connection(index);
-                                            root.selected_index = -1;
-                                            menu_visible = false;
-                                        }
+                                    clicked => {
+                                        root.active_selection_mode = "connection";
+                                        root.select_connection(index);
+                                        root.selected_index = -1;
+                                        menu_visible = false;
                                     }
                                 }
                             }
@@ -2222,416 +2263,416 @@ export component AppWindow inherits Window {
                 }
             }
         }
+    }
 
-        if menu_visible: Rectangle {
-            x: menu_x;
-            y: menu_y;
-            width: 160px;
-            height: 210px;
-            background: #ffffff;
-            border-radius: 6px;
+    if menu_visible: Rectangle {
+        x: menu_x;
+        y: menu_y;
+        width: 160px;
+        height: 210px;
+        background: #ffffff;
+        border-radius: 6px;
+        border-width: 1px;
+        border-color: #dcdcdc;
+
+        VerticalLayout {
+            padding: 4px;
+            spacing: 2px;
+
+            Rectangle {
+                background: copy-t.has-hover ? #f0f0f0 : transparent;
+                height: 26px;
+                border-radius: 4px;
+                Text {
+                    text: "Copy";
+                    x: 8px;
+                    vertical-alignment: center;
+                    height: 100%;
+                    font-size: 13px;
+                }
+
+                Text {
+                    text: "ctrl-c";
+                    x: parent.width - self.width - 8px;
+                    vertical-alignment: center;
+                    height: 100%;
+                    font-size: 11px;
+                    color: #888888;
+                }
+
+                copy-t := TouchArea {
+                    clicked => {
+                        root.copy_selected_subgraph(root.backup_selected_indexes);
+                        menu_visible = false;
+                    }
+                }
+            }
+
+            Rectangle {
+                background: paste-t.has-hover ? #f0f0f0 : transparent;
+                height: 26px;
+                border-radius: 4px;
+                Text {
+                    text: "Paste";
+                    x: 8px;
+                    vertical-alignment: center;
+                    height: 100%;
+                    font-size: 13px;
+                }
+
+                Text {
+                    text: "ctrl-v";
+                    x: parent.width - self.width - 8px;
+                    vertical-alignment: center;
+                    height: 100%;
+                    font-size: 11px;
+                    color: #888888;
+                }
+
+                paste-t := TouchArea {
+                    clicked => {
+                        menu_visible = false;
+
+                        root.paste_selected_subgraph(    (-root.canvas_pan_x / 1px) + 300,     (-root.canvas_pan_y / 1px) + 200);
+                    }
+                }
+            }
+
+            Rectangle {
+                background: cut-t.has-hover ? #f0f0f0 : transparent;
+                height: 26px;
+                border-radius: 4px;
+                Text {
+                    text: "Cut";
+                    x: 8px;
+                    vertical-alignment: center;
+                    height: 100%;
+                    font-size: 13px;
+                }
+
+                Text {
+                    text: "ctrl-x";
+                    x: parent.width - self.width - 8px;
+                    vertical-alignment: center;
+                    height: 100%;
+                    font-size: 11px;
+                    color: #888888;
+                }
+
+                cut-t := TouchArea {
+                    clicked => {
+                        menu_visible = false;
+                        root.cut_selected_subgraph(root.backup_selected_indexes);
+                    }
+                }
+            }
+
+            Rectangle {
+                background: del-t.has-hover ? #f0f0f0 : transparent;
+                height: 26px;
+                border-radius: 4px;
+                Text {
+                    text: "Delete";
+                    x: 8px;
+                    vertical-alignment: center;
+                    height: 100%;
+                    font-size: 13px;
+                }
+
+                Text {
+                    text: "ctrl-d";
+                    x: parent.width - self.width - 8px;
+                    vertical-alignment: center;
+                    height: 100%;
+                    font-size: 11px;
+                    color: #888888;
+                }
+
+                del-t := TouchArea {
+                    clicked => {
+                        if (root.active_selection_mode == "connection") {
+                            root.delete_selected_connection();
+                        } else if (root.active_selection_mode == "node" || root.backup_selected_indexes.length > 0) {
+                            root.delete_selected_symbols(root.backup_selected_indexes);
+                        }
+                        root.selected_indexes = [];
+                        root.backup_selected_indexes = [];
+                        root.active_selection_mode = "";
+                        root.select_connection(-1);
+                        menu_visible = false;
+                    }
+                }
+            }
+
+            Rectangle {
+                height: 1px;
+                background: #e8e8e8;
+            }
+
+            Rectangle {
+                background: u.has-hover ? #f0f0f0 : transparent;
+                height: 26px;
+                border-radius: 4px;
+                Text {
+                    text: "Undo";
+                    x: 8px;
+                    vertical-alignment: center;
+                    height: 100%;
+                    font-size: 13px;
+                }
+
+                Text {
+                    text: "ctrl-z";
+                    x: parent.width - self.width - 8px;
+                    vertical-alignment: center;
+                    height: 100%;
+                    font-size: 11px;
+                    color: #888888;
+                }
+
+                u := TouchArea {
+                    clicked => {
+                        root.undo_action();
+                        menu_visible = false;
+                    }
+                }
+            }
+
+            Rectangle {
+                background: r.has-hover ? #f0f0f0 : transparent;
+                height: 26px;
+                border-radius: 4px;
+                Text {
+                    text: "Redo";
+                    x: 8px;
+                    vertical-alignment: center;
+                    height: 100%;
+                    font-size: 13px;
+                }
+
+                Text {
+                    text: "ctrl-y";
+                    x: parent.width - self.width - 8px;
+                    vertical-alignment: center;
+                    height: 100%;
+                    font-size: 11px;
+                    color: #888888;
+                }
+
+                r := TouchArea {
+                    clicked => {
+                        menu_visible = false;
+                        root.redo_action();
+                    }
+                }
+            }
+
+            Rectangle {
+                height: 1px;
+                background: #e8e8e8;
+            }
+
+            Rectangle {
+                background: sel-t.has-hover ? #f0f0f0 : transparent;
+                height: 26px;
+                border-radius: 4px;
+                Text {
+                    text: "Select All";
+                    x: 8px;
+                    vertical-alignment: center;
+                    height: 100%;
+                    font-size: 13px;
+                }
+
+                Text {
+                    text: "ctrl-a";
+                    x: parent.width - self.width - 8px;
+                    vertical-alignment: center;
+                    height: 100%;
+                    font-size: 11px;
+                    color: #888888;
+                }
+
+                sel-t := TouchArea {
+                    clicked => {
+                        root.select_all();
+                        root.backup_selected_indexes = root.selected_indexes;
+                        menu_visible = false;
+                    }
+                }
+            }
+        }
+    }
+
+    if (root.show_node_modal): Rectangle {
+        width: parent.width;
+        height: parent.height;
+        background: #00000044;
+
+        TouchArea { }
+
+        Rectangle {
+            width: 360px;
+            height: 240px;
+            background: white;
+            border-radius: 8px;
             border-width: 1px;
-            border-color: #dcdcdc;
+            border-color: #e0e0e0;
+            clip: true;
 
             VerticalLayout {
-                padding: 4px;
-                spacing: 2px;
+                padding: 24px;
+                spacing: 16px;
 
-                Rectangle {
-                    background: copy-t.has-hover ? #f0f0f0 : transparent;
-                    height: 26px;
-                    border-radius: 4px;
-                    Text {
-                        text: "Copy";
-                        x: 8px;
-                        vertical-alignment: center;
-                        height: 100%;
-                        font-size: 13px;
-                    }
-
-                    Text {
-                        text: "ctrl-c";
-                        x: parent.width - self.width - 8px;
-                        vertical-alignment: center;
-                        height: 100%;
-                        font-size: 11px;
-                        color: #888888;
-                    }
-
-                    copy-t := TouchArea {
-                        clicked => {
-                            root.copy_selected_subgraph(root.backup_selected_indexes);
-                            menu_visible = false;
-                        }
-                    }
+                Text {
+                    text: "Edit Node Properties";
+                    font-size: 16px;
+                    font-weight: 700;
+                    color: #222222;
                 }
 
-                Rectangle {
-                    background: paste-t.has-hover ? #f0f0f0 : transparent;
-                    height: 26px;
-                    border-radius: 4px;
-                    Text {
-                        text: "Paste";
-                        x: 8px;
-                        vertical-alignment: center;
-                        height: 100%;
-                        font-size: 13px;
-                    }
-
-                    Text {
-                        text: "ctrl-v";
-                        x: parent.width - self.width - 8px;
-                        vertical-alignment: center;
-                        height: 100%;
-                        font-size: 11px;
-                        color: #888888;
-                    }
-
-                    paste-t := TouchArea {
-                        clicked => {
-                            menu_visible = false;
-
-                            root.paste_selected_subgraph(    (-root.canvas_pan_x / 1px) + 300,     (-root.canvas_pan_y / 1px) + 200);
-                        }
-                    }
-                }
-
-                Rectangle {
-                    background: cut-t.has-hover ? #f0f0f0 : transparent;
-                    height: 26px;
-                    border-radius: 4px;
-                    Text {
-                        text: "Cut";
-                        x: 8px;
-                        vertical-alignment: center;
-                        height: 100%;
-                        font-size: 13px;
-                    }
-
-                    Text {
-                        text: "ctrl-x";
-                        x: parent.width - self.width - 8px;
-                        vertical-alignment: center;
-                        height: 100%;
-                        font-size: 11px;
-                        color: #888888;
-                    }
-
-                    cut-t := TouchArea {
-                        clicked => {
-                            menu_visible = false;
-                            root.cut_selected_subgraph(root.backup_selected_indexes);
-                        }
-                    }
-                }
-
-                Rectangle {
-                    background: del-t.has-hover ? #f0f0f0 : transparent;
-                    height: 26px;
-                    border-radius: 4px;
-                    Text {
-                        text: "Delete";
-                        x: 8px;
-                        vertical-alignment: center;
-                        height: 100%;
-                        font-size: 13px;
-                    }
-
-                    Text {
-                        text: "ctrl-d";
-                        x: parent.width - self.width - 8px;
-                        vertical-alignment: center;
-                        height: 100%;
-                        font-size: 11px;
-                        color: #888888;
-                    }
-
-                    del-t := TouchArea {
-                        clicked => {
-                            if (root.active_selection_mode == "connection") {
-                                root.delete_selected_connection();
-                            } else if (root.active_selection_mode == "node" || root.backup_selected_indexes.length > 0) {
-                                root.delete_selected_symbols(root.backup_selected_indexes);
-                            }
-                            root.selected_indexes = [];
-                            root.backup_selected_indexes = [];
-                            root.active_selection_mode = "";
-                            root.select_connection(-1);
-                            menu_visible = false;
-                        }
-                    }
-                }
-
-                Rectangle {
-                    height: 1px;
-                    background: #e8e8e8;
-                }
-
-                Rectangle {
-                    background: u.has-hover ? #f0f0f0 : transparent;
-                    height: 26px;
-                    border-radius: 4px;
-                    Text {
-                        text: "Undo";
-                        x: 8px;
-                        vertical-alignment: center;
-                        height: 100%;
-                        font-size: 13px;
-                    }
-
-                    Text {
-                        text: "ctrl-z";
-                        x: parent.width - self.width - 8px;
-                        vertical-alignment: center;
-                        height: 100%;
-                        font-size: 11px;
-                        color: #888888;
-                    }
-
-                    u := TouchArea {
-                        clicked => {
-                            root.undo_action();
-                            menu_visible = false;
-                        }
-                    }
-                }
-
-                Rectangle {
-                    background: r.has-hover ? #f0f0f0 : transparent;
-                    height: 26px;
-                    border-radius: 4px;
-                    Text {
-                        text: "Redo";
-                        x: 8px;
-                        vertical-alignment: center;
-                        height: 100%;
-                        font-size: 13px;
-                    }
-
-                    Text {
-                        text: "ctrl-y";
-                        x: parent.width - self.width - 8px;
-                        vertical-alignment: center;
-                        height: 100%;
-                        font-size: 11px;
-                        color: #888888;
-                    }
-
-                    r := TouchArea {
-                        clicked => {
-                            menu_visible = false;
-                            root.redo_action();
-                        }
-                    }
-                }
-
-                Rectangle {
-                    height: 1px;
-                    background: #e8e8e8;
-                }
-
-                Rectangle {
-                    background: sel-t.has-hover ? #f0f0f0 : transparent;
-                    height: 26px;
-                    border-radius: 4px;
-                    Text {
-                        text: "Select All";
-                        x: 8px;
-                        vertical-alignment: center;
-                        height: 100%;
-                        font-size: 13px;
-                    }
-
-                    Text {
-                        text: "ctrl-a";
-                        x: parent.width - self.width - 8px;
-                        vertical-alignment: center;
-                        height: 100%;
-                        font-size: 11px;
-                        color: #888888;
-                    }
-
-                    sel-t := TouchArea {
-                        clicked => {
-                            root.select_all();
-                            root.backup_selected_indexes = root.selected_indexes;
-                            menu_visible = false;
-                        }
-                    }
-                }
-            }
-        }
-
-        if (root.show_node_modal): Rectangle {
-            width: parent.width;
-            height: parent.height;
-            background: #00000044;
-
-            TouchArea { }
-
-            Rectangle {
-                width: 360px;
-                height: 240px;
-                background: white;
-                border-radius: 8px;
-                border-width: 1px;
-                border-color: #e0e0e0;
-                clip: true;
-
-                VerticalLayout {
-                    padding: 24px;
+                HorizontalLayout {
                     spacing: 16px;
-
                     Text {
-                        text: "Edit Node Properties";
-                        font-size: 16px;
-                        font-weight: 700;
-                        color: #222222;
+                        text: "Label:";
+                        vertical-alignment: center;
+                        font-size: 13px;
+                        font-weight: 500;
+                        color: #555555;
+                        width: 50px;
                     }
 
-                    HorizontalLayout {
-                        spacing: 16px;
-                        Text {
-                            text: "Label:";
-                            vertical-alignment: center;
+                    Rectangle {
+                        background: #f8f9fa;
+                        border-radius: 4px;
+                        border-width: 1px;
+                        border-color: #cccccc;
+                        height: 32px;
+
+                        TextInput {
+                            text: root.edit_label;
                             font-size: 13px;
-                            font-weight: 500;
-                            color: #555555;
-                            width: 50px;
-                        }
-
-                        Rectangle {
-                            background: #f8f9fa;
-                            border-radius: 4px;
-                            border-width: 1px;
-                            border-color: #cccccc;
-                            height: 32px;
-
-                            TextInput {
-                                text: root.edit_label;
-                                font-size: 13px;
-                                vertical-alignment: center;
-                                single-line: true;
-
-                                x: 8px;
-                                width: parent.width - 16px;
-
-                                edited => {
-                                    root.edit_label = self.text;
-                                }
-                            }
-                        }
-                    }
-
-                    HorizontalLayout {
-                        spacing: 16px;
-                        Text {
-                            text: "Value:";
                             vertical-alignment: center;
-                            font-size: 13px;
-                            font-weight: 500;
-                            color: #555555;
-                            width: 50px;
-                        }
+                            single-line: true;
 
-                        Rectangle {
-                            background: #f8f9fa;
-                            border-radius: 4px;
-                            border-width: 1px;
-                            border-color: #cccccc;
-                            height: 32px;
+                            x: 8px;
+                            width: parent.width - 16px;
 
-                            TextInput {
-                                text: root.edit_value;
-                                font-size: 13px;
-                                vertical-alignment: center;
-                                single-line: true;
-                                x: 8px;
-                                width: parent.width - 16px;
-
-                                edited => {
-                                    root.edit_value = self.text;
-                                }
+                            edited => {
+                                root.edit_label = self.text;
                             }
                         }
                     }
+                }
 
-                    Rectangle { }
+                HorizontalLayout {
+                    spacing: 16px;
+                    Text {
+                        text: "Value:";
+                        vertical-alignment: center;
+                        font-size: 13px;
+                        font-weight: 500;
+                        color: #555555;
+                        width: 50px;
+                    }
 
-                    HorizontalLayout {
-                        spacing: 12px;
-                        alignment: end;
+                    Rectangle {
+                        background: #f8f9fa;
+                        border-radius: 4px;
+                        border-width: 1px;
+                        border-color: #cccccc;
+                        height: 32px;
 
-                        Button {
-                            text: "Close";
-                            width: 85px;
-                            height: 32px;
-                            primary: true;
-                            clicked => {
-                                root.show_node_modal = false;
+                        TextInput {
+                            text: root.edit_value;
+                            font-size: 13px;
+                            vertical-alignment: center;
+                            single-line: true;
+                            x: 8px;
+                            width: parent.width - 16px;
+
+                            edited => {
+                                root.edit_value = self.text;
                             }
                         }
+                    }
+                }
 
-                        Button {
-                            text: "Save";
-                            width: 85px;
-                            height: 32px;
-                            primary: true;
-                            clicked => {
-                                root.save_node_properties(root.editing_index, root.edit_label, root.edit_value);
-                                root.show_node_modal = false;
-                            }
+                Rectangle { }
+
+                HorizontalLayout {
+                    spacing: 12px;
+                    alignment: end;
+
+                    Button {
+                        text: "Close";
+                        width: 85px;
+                        height: 32px;
+                        primary: true;
+                        clicked => {
+                            root.show_node_modal = false;
+                        }
+                    }
+
+                    Button {
+                        text: "Save";
+                        width: 85px;
+                        height: 32px;
+                        primary: true;
+                        clicked => {
+                            root.save_node_properties(root.editing_index, root.edit_label, root.edit_value);
+                            root.show_node_modal = false;
                         }
                     }
                 }
             }
         }
+    }
 
-        if (root.show_alert): Rectangle {
-            width: parent.width;
-            height: parent.height;
-            background: #00000044;
+    if (root.show_alert): Rectangle {
+        width: parent.width;
+        height: parent.height;
+        background: #00000044;
 
-            TouchArea { }
+        TouchArea { }
 
-            Rectangle {
-                width: 320px;
-                height: 180px;
-                background: white;
-                border-radius: 8px;
-                border-width: 1px;
-                border-color: #dddddd;
-                clip: true;
+        Rectangle {
+            width: 320px;
+            height: 180px;
+            background: white;
+            border-radius: 8px;
+            border-width: 1px;
+            border-color: #dddddd;
+            clip: true;
 
-                VerticalLayout {
-                    padding: 16px;
-                    spacing: 12px;
+            VerticalLayout {
+                padding: 16px;
+                spacing: 12px;
 
-                    Text {
-                        text: "Notification";
-                        font-size: 16px;
-                        font-weight: 700;
-                        color: #333333;
-                    }
+                Text {
+                    text: "Notification";
+                    font-size: 16px;
+                    font-weight: 700;
+                    color: #333333;
+                }
 
-                    Text {
-                        text: root.alert_message;
-                        font-size: 14px;
-                        color: #555555;
-                        wrap: word-wrap;
-                        vertical-alignment: top;
-                    }
+                Text {
+                    text: root.alert_message;
+                    font-size: 14px;
+                    color: #555555;
+                    wrap: word-wrap;
+                    vertical-alignment: top;
+                }
 
-                    HorizontalLayout {
-                        alignment: center;
+                HorizontalLayout {
+                    alignment: center;
 
-                        Button {
-                            text: "Ok";
-                            width: 100px;
-                            primary: true;
-                            clicked => {
-                                root.show_alert = false;
-                            }
+                    Button {
+                        text: "Ok";
+                        width: 100px;
+                        primary: true;
+                        clicked => {
+                            root.show_alert = false;
                         }
                     }
                 }
