@@ -578,14 +578,19 @@ fn main() -> Result<(), slint::PlatformError> {
             }
         }
     });
-
     ui.on_select_connection({
         let connections = connections.clone();
         move |index| {
-            if index < 0 {
-                println!("Connection unselected or cleared.");
+            if index < 0 {           
+                for i in 0..connections.row_count() {
+                    if let Some(mut conn) = connections.row_data(i) {
+                        conn.selected = false;
+                        connections.set_row_data(i, conn);
+                    }
+                }
+                println!("All connections deselected.");
                 return;
-            }
+            }        
             for i in 0..connections.row_count() {
                 if let Some(mut conn) = connections.row_data(i) {
                     conn.selected = i == index as usize;
@@ -595,7 +600,6 @@ fn main() -> Result<(), slint::PlatformError> {
             println!("Selected connection {}", index);
         }
     });
-
     ui.on_delete_selected_connection({
         let connections = connections.clone();
         let save_h = save_history.clone();
