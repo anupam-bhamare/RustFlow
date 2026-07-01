@@ -1,6 +1,7 @@
-import { Button } from "std-widgets.slint";
+import { Button, LineEdit, ComboBox, ScrollView } from "std-widgets.slint";
 
 export struct SymbolEntry {
+    id: int,
     name: string,
     label: string,
     value: string,
@@ -10,6 +11,14 @@ export struct SymbolEntry {
     bg_color: string,
     creation_mode: int,
     is_selected: bool,
+    ip_ports: int,
+    op_ports: int,
+    ip_names: [string],
+    ip_values: [string],
+    op_names: [string],
+    op_values: [string],
+    ip_types: [string],
+    op_types: [string],
 }
 
 export struct Connection {
@@ -19,135 +28,172 @@ export struct Connection {
     creation_mode: int,
     from_port: string,
     to_port: string,
+    from_port_offset_x: float,
+    from_port_offset_y: float,
+    to_port_offset_x: float,
+    to_port_offset_y: float,
 }
 
 struct LibraryItem {
     name: string,
     node_type: string,
 }
-
 component NodeSymbol inherits Rectangle {
-
     callback port_clicked(bool, string);
 
-    in property <string> label: "Node";
-    in property <int> creation_mode;
+    in property <string> label: "Data Sorter";
+    in property <string> value: "Active";
+    in property <int> ip_ports: 2;
+    in property <int> op_ports: 2;
 
-    width: 120px;
-    height: 40px;
+    property <length> row_height: 35px;
+    property <length> port_size: 10px;
+    property <length> header_height: 40px;
+
+    in property <[string]> ip_names;
+    in property <[string]> ip_values;
+    in property <[string]> op_names;
+    in property <[string]> op_values;
+    in property <[string]> ip_types;
+    in property <[string]> op_types;
+    in property <int> creation_mode: 0;
+    width: 140px;
+    height: header_height + ((ip_ports + op_ports) * row_height);
     background: #e1f5fe.with-alpha(0.5);
     border-width: 1px;
     border-color: #0288d1;
     border-radius: 4px;
+    clip: false;
 
-    if (root.creation_mode == 0 || root.creation_mode == 2): Rectangle {
-        x: -12px;
-        y: 0px;
-        width: 24px;
-        height: 40px;
-        background: transparent;
+    VerticalLayout {
+        y: 2px;
+        height: header_height;
+        Text {
+            text: root.label;
+            font-weight: 700;
+            horizontal-alignment: center;
+        }
+
+        Text {
+            text: root.value;
+            font-italic: true;
+            horizontal-alignment: center;
+        }
 
         Rectangle {
-            x: 7px;
-            y: 15px;
-            width: 10px;
-            height: 10px;
-            border-radius: 5px;
+
+            width: parent.width;
+            height: 0.5px;
+            background: #0288d1.with-alpha(0.5);
+        }
+    }
+
+    for port[i] in root.ip_ports: Rectangle {
+        y: header_height + (i * row_height);
+        width: parent.width;
+        height: row_height;
+
+        Rectangle {
+            x: -port_size / 2;
+            y: (parent.height - self.height) / 2;
+            width: port_size;
+            height: port_size;
+            border-radius: port_size / 2;
             background: left_touch.has-hover ? orange : #0288d1;
         }
 
+        HorizontalLayout {
+            padding-left: port_size;
+            VerticalLayout {
+                alignment: center;
+                Text {
+                    text: root.ip_names[i];
+                    overflow: elide;
+                }
+
+                Text {
+                    text: root.ip_values[i];
+                    overflow: elide;
+                    color: gray;
+                }
+            }
+        }
+
+        Rectangle {
+            y: row_height;
+            width: parent.width - port_size;
+            height: 0.5px;
+            background: #0288d1.with-alpha(0.5);
+        }
+
         left_touch := TouchArea {
-            width: 100%;
-            height: 100%;
-            clicked => {
-                root.port_clicked(true, "left");
+            x: -port_size;
+            width: parent.width + port_size;
+            pointer-event(evt) => {
+                if (evt.kind == PointerEventKind.down) {
+                    root.port_clicked(true, "left_" + i);
+                    return EventResult.accept;
+                }
+                return EventResult.reject;
             }
         }
     }
 
-    if (root.creation_mode == 0 || root.creation_mode == 2): Rectangle {
-        x: parent.width - 12px;
-        y: 0px;
-        width: 24px;
-        height: 40px;
-        background: transparent;
+    for port[i] in root.op_ports: Rectangle {
+        y: header_height + (root.ip_ports * row_height) + (i * row_height);
+        width: parent.width;
+        height: row_height;
 
         Rectangle {
-            x: 7px;
-            y: 15px;
-            width: 10px;
-            height: 10px;
-            border-radius: 5px;
+            x: parent.width - port_size / 2;
+            y: (parent.height - self.height) / 2;
+            width: port_size;
+            height: port_size;
+            border-radius: port_size / 2;
             background: right_touch.has-hover ? orange : #0288d1;
         }
 
+        HorizontalLayout {
+            padding-right: port_size;
+            alignment: end;
+            VerticalLayout {
+                alignment: center;
+                Text {
+                    text: root.op_names[i];
+                    overflow: elide;
+                    horizontal-alignment: right;
+                }
+
+                Text {
+                    text: root.op_values[i];
+                    overflow: elide;
+                    color: gray;
+                    horizontal-alignment: right;
+                }
+            }
+        }
+
+        Rectangle {
+            y: row_height;
+            width: parent.width - port_size;
+            height: 0.5px;
+            background: #0288d1.with-alpha(0.5);
+        }
+
         right_touch := TouchArea {
-            width: 100%;
-            height: 100%;
-            clicked => {
-                root.port_clicked(false, "right");
+            x: 0;
+            width: parent.width + port_size;
+            pointer-event(evt) => {
+                if (evt.kind == PointerEventKind.down) {
+                    root.port_clicked(false, "right_" + i);
+                    return EventResult.accept;
+                }
+                return EventResult.reject;
             }
         }
-    }
-
-    if (root.creation_mode == 1 || root.creation_mode == 2): Rectangle {
-        x: 0px;
-        y: -12px;
-        width: 120px;
-        height: 24px;
-        background: transparent;
-
-        Rectangle {
-            x: (parent.width / 2) - 5px;
-            y: 7px;
-            width: 10px;
-            height: 10px;
-            border-radius: 5px;
-            background: top_touch.has-hover ? orange : #0288d1;
-        }
-
-        top_touch := TouchArea {
-            width: 100%;
-            height: 100%;
-            clicked => {
-                root.port_clicked(true, "top");
-            }
-        }
-    }
-
-    if (root.creation_mode == 1 || root.creation_mode == 2): Rectangle {
-        x: 0px;
-        y: parent.height - 12px;
-        width: 120px;
-        height: 24px;
-        background: transparent;
-
-        Rectangle {
-            x: (parent.width / 2) - 5px;
-            y: 7px;
-            width: 10px;
-            height: 10px;
-            border-radius: 5px;
-            background: bottom_touch.has-hover ? orange : #0288d1;
-        }
-
-        bottom_touch := TouchArea {
-            width: 100%;
-            height: 100%;
-            clicked => {
-                root.port_clicked(false, "bottom");
-            }
-        }
-    }
-
-    Text {
-        text: root.label;
-        color: rgb(40, 40, 50);
-        width: 100%;
-        horizontal-alignment: center;
-        vertical-alignment: center;
     }
 }
+
 
 component InputConnectorSymbol inherits Rectangle {
 
@@ -225,11 +271,42 @@ component OutputConnectorSymbol inherits Rectangle {
 
 export component AppWindow inherits Window {
 
-    preferred-width: 1440px;
-    preferred-height: 900px;
-    min-width: 1024px;
-    min-height: 700px;
+    preferred-width: 1280px;
+    preferred-height: 720px;
 
+    min-width: 400px;
+    min-height: 400px;
+    in-out property <[string]> ip_names: [];
+    in-out property <[string]> ip_values: [];
+    in-out property <[string]> op_names: [];
+    in-out property <[string]> op_values: [];
+    in-out property <[string]> ip_types: [];
+    in-out property <[string]> op_types: [];
+    pure function is_valid(type: string, val: string) -> bool {
+        if (type == "Number") {
+
+            if (val == "") { return false; }
+            return true;
+        }
+        return true;
+    }
+
+    callback add_ip_port();
+    callback add_op_port();
+    callback request_edit_node(int);
+    in-out property <int> ip_port_count;
+    in-out property <int> op_port_count;
+    in-out property <int> port_count;
+    in-out property <[string]> edit_values;
+    in-out property <string> temp_ip_ports: "";
+    in-out property <string> temp_op_ports: "";
+    in-out property <int> function_node_ip_ports: 0;
+    in-out property <int> function_node_op_ports: 0;
+    in-out property <int> ip_ports: 0;
+    in-out property <int> op_ports: 0;
+
+    callback deploy_flow_clicked();
+    in-out property <string> debug_text: "";
     property <bool> common_expanded: false;
     property <bool> function_expanded: false;
     property <bool> parser_expanded: false;
@@ -240,7 +317,6 @@ export component AppWindow inherits Window {
     property <bool> layout_expanded: false;
     property <bool> connectors_expanded: false;
     property <bool> prevent_placement: false;
-    property <bool> is_panning: false;
     property <[int]> backup_selected_indexes: [];
     property <length> menu_x: 0px;
     property <length> menu_y: 0px;
@@ -271,6 +347,7 @@ export component AppWindow inherits Window {
     in-out property <float> drag_x: 0;
     in-out property <float> drag_y: 0;
     in-out property <bool> show_node_modal: false;
+    in-out property <bool> show_port_configuration_modal: false;
     in-out property <string> edit_label: "";
     in-out property <string> edit_value: "";
     in-out property <int> editing_index: -1;
@@ -291,9 +368,9 @@ export component AppWindow inherits Window {
     callback redo_action();
     callback vertical_layout();
     callback horizontal_layout();
-    callback save_node_properties(int, string, string);
+    callback save_node_properties(int, int, int, string, [string], [string], [string], [string], [string], [string]) -> bool;
     callback select_library_symbol(string);
-    callback place_symbol(string, string, string, float, float, int);
+    callback place_symbol(string, string, string, float, float, int, int, int);
     callback update_symbol_position(int, float, float);
     callback delete_selected_symbol();
     callback clear_canvas();
@@ -378,7 +455,9 @@ export component AppWindow inherits Window {
                                 for node in [
                                     { name: "Text", node_type: "ui_text" },
                                     { name: "Button", node_type: "ui_button" },
-                                    { name: "Dropdown", node_type: "ui_dropdown" }
+                                    { name: "Dropdown", node_type: "ui_dropdown" },
+                                    { name: "Output", node_type: "ui_output" },
+                                    { name: "Error", node_type: "ui_error" }
                                 ]: Rectangle {
                                     height: 35px;
                                     background: common-touch.has-hover ? #e2dfed : #edebf4;
@@ -403,6 +482,8 @@ export component AppWindow inherits Window {
                                             root.drag_x = (self.mouse-x + self.absolute-position.x - 260px) / 1px;
                                             root.drag_y = (self.mouse-y + self.absolute-position.y) / 1px;
                                             root.creation_mode = root.active_layout_mode;
+                                            root.ip_ports = root.function_node_ip_ports;
+                                            root.op_ports = root.function_node_op_ports;
                                         }
                                     }
                                 }
@@ -441,14 +522,19 @@ export component AppWindow inherits Window {
 
                             if (root.function_expanded): VerticalLayout {
                                 spacing: 6px;
-                                for node in ["Switch", "Change", "Range", "Delay", "Trigger"]: Rectangle {
+                                for node in [
+                                    { name: "Function", node_type: "ui_function" },
+                                    { name: "Switch", node_type: "ui_switch" },
+                                    { name: "Delay", node_type: "ui_delay" }
+                                ]: Rectangle {
                                     height: 35px;
                                     background: function-touch.has-hover ? #e2dfed : #edebf4;
                                     border-radius: 4px;
                                     animate background { duration: 150ms; }
 
                                     Text {
-                                        text: node;
+                                        text: node.name;
+
                                         color: black;
                                         x: 10px;
                                         vertical-alignment: center;
@@ -458,11 +544,14 @@ export component AppWindow inherits Window {
                                     function_touch := TouchArea {
                                         moved => {
                                             root.is_dragging = true;
-                                            root.drag_name = node;
-                                            root.select_library_symbol(node);
+                                            root.drag_name = node.name;
+                                            root.drag_type = node.node_type;
+                                            root.select_library_symbol(node.name);
                                             root.drag_x = (self.mouse-x + self.absolute-position.x - 260px) / 1px;
                                             root.drag_y = (self.mouse-y + self.absolute-position.y) / 1px;
                                             root.creation_mode = root.active_layout_mode;
+                                            root.ip_ports = root.function_node_ip_ports;
+                                            root.op_ports = root.function_node_op_ports;
                                         }
                                     }
                                 }
@@ -712,6 +801,7 @@ export component AppWindow inherits Window {
                             Rectangle {
                                 height: 36px;
                                 background: rose_touch.has-hover ? #ddc1c1 : #edd1d1;
+                                border-radius: 4px;
                                 Text {
                                     text: (root.actions_expanded ? "▼ " : "▶ ") + "Actions";
                                     color: white;
@@ -808,7 +898,7 @@ export component AppWindow inherits Window {
 
                             if (root.layout_expanded): VerticalLayout {
                                 spacing: 6px;
-                                for node in ["Horizontal", "Vertical", "Both"]: Rectangle {
+                                for node in ["Horizontal", "Vertical", "Port Configuration"]: Rectangle {
                                     height: 35px;
                                     background: layout-touch.has-hover ? #e2dfed : #edebf4;
                                     border-radius: 4px;
@@ -830,8 +920,8 @@ export component AppWindow inherits Window {
                                             } else if (node == "Vertical") {
                                                 root.active_layout_mode = 1;
                                                 root.vertical_layout();
-                                            } else if (node == "Both") {
-                                                root.active_layout_mode = 2;
+                                            } else if (node == "Port Configuration") {
+                                                root.show_port_configuration_modal = true;
                                             }
                                         }
                                     }
@@ -841,6 +931,7 @@ export component AppWindow inherits Window {
                             Rectangle {
                                 height: 36px;
                                 background: green_touch.has-hover ? #abdba2 : #bbebb2;
+                                border-radius: 4px;
                                 Text {
                                     text: (root.connectors_expanded ? "▼ " : "▶ ") + "Connectors";
                                     color: white;
@@ -898,72 +989,98 @@ export component AppWindow inherits Window {
                         }
                     }
 
-                    Rectangle {
-                        height: 40px;
-                        vertical-stretch: 0;
-                        HorizontalLayout {
-                            spacing: 10px;
+                    VerticalLayout {
+                        spacing: 5px;
 
-                            Rectangle {
-                                background: #e06c75;
-                                border-radius: 4px;
-                                Button {
-                                    text: "Del ";
-                                    width: 100%;
-                                    height: 100%;
-                                    clicked => {
-                                        menu_visible = false;
-                                        if (root.active_selection_mode == "connection") {
-                                            root.delete_selected_connection();
-                                        } else if (root.active_selection_mode == "node" || root.backup_selected_indexes.length > 0) {
-                                            root.delete_selected_symbols(root.backup_selected_indexes);
+                        Rectangle {
+
+                            height: 40px;
+                            vertical-stretch: 0;
+                            HorizontalLayout {
+                                spacing: 10px;
+
+                                Rectangle {
+                                    background: #e06c75;
+                                    border-radius: 4px;
+                                    Button {
+                                        text: "Del ";
+                                        width: 100%;
+                                        height: 100%;
+                                        clicked => {
+                                            menu_visible = false;
+                                            if (root.active_selection_mode == "connection") {
+                                                root.delete_selected_connection();
+                                            } else if (root.active_selection_mode == "node" || root.backup_selected_indexes.length > 0) {
+                                                root.delete_selected_symbols(root.backup_selected_indexes);
+                                            }
+                                            root.selected_indexes = [];
+                                            root.backup_selected_indexes = [];
+                                            root.active_selection_mode = "";
+                                            root.select_connection(-1);
                                         }
-                                        root.selected_indexes = [];
-                                        root.backup_selected_indexes = [];
-                                        root.active_selection_mode = "";
-                                        root.select_connection(-1);
+                                    }
+                                }
+
+                                Rectangle {
+                                    background: #d19a66;
+                                    border-radius: 4px;
+                                    Button {
+                                        text: "Clr ";
+                                        width: 100%;
+                                        height: 100%;
+                                        clicked => {
+                                            menu_visible = false;
+                                            root.clear_canvas();
+                                        }
+                                    }
+                                }
+
+                                Rectangle {
+                                    background: #61afef;
+                                    border-radius: 4px;
+                                    Button {
+                                        text: "Save";
+                                        width: 100%;
+                                        height: 100%;
+                                        clicked => {
+                                            menu_visible = false;
+                                            root.save_flow();
+                                        }
+                                    }
+                                }
+
+                                Rectangle {
+                                    background: #98c379;
+                                    border-radius: 4px;
+                                    Button {
+                                        text: "Load";
+                                        width: 100%;
+                                        height: 100%;
+                                        clicked => {
+                                            menu_visible = false;
+                                            root.load_flow();
+                                        }
                                     }
                                 }
                             }
+                        }
+
+                        Rectangle {
+
+                            height: 40px;
+                            vertical-stretch: 0;
 
                             Rectangle {
-                                background: #d19a66;
+                                background: #2432b7;
                                 border-radius: 4px;
                                 Button {
-                                    text: "Clr ";
+                                    text: "Deploy Flow";
                                     width: 100%;
                                     height: 100%;
                                     clicked => {
                                         menu_visible = false;
-                                        root.clear_canvas();
-                                    }
-                                }
-                            }
 
-                            Rectangle {
-                                background: #61afef;
-                                border-radius: 4px;
-                                Button {
-                                    text: "Save";
-                                    width: 100%;
-                                    height: 100%;
-                                    clicked => {
-                                        menu_visible = false;
-                                        root.save_flow();
-                                    }
-                                }
-                            }
-
-                            Rectangle {
-                                background: #98c379;
-                                border-radius: 4px;
-                                Button {
-                                    text: "Load";
-                                    width: 100%;
-                                    height: 100%;
-                                    clicked => {
-                                        menu_visible = false;
-                                        root.load_flow();
+                                        root.deploy_flow_clicked();
                                     }
                                 }
                             }
@@ -1070,38 +1187,12 @@ export component AppWindow inherits Window {
                     property <physical-length> right_click_press_y: 0;
 
                     pointer-event(event) => {
-                        if (event.button == PointerEventButton.right) {
-                            if (event.kind == PointerEventKind.down) {
-                                root.is_panning = true;
-                                root.pan_start_x = self.mouse-x / 1px;
-                                root.pan_start_y = self.mouse-y / 1px;
 
-                                right_click_press_x = self.mouse-x;
-                                right_click_press_y = self.mouse-y;
-                                menu_visible = false;
-                            }
-                            if (event.kind == PointerEventKind.up) {
-                                root.is_panning = false;
-                                let dx = (self.mouse-x - right_click_press_x) / 1px;
-                                let dy = (self.mouse-y - right_click_press_y) / 1px;
-                                let drag_distance_sq = (dx * dx) + (dy * dy);
-
-                                if (drag_distance_sq < 16) {
-                                    root.selected_index = -1;
-                                    root.select_connection(-1);
-                                    root.selected_indexes = [];
-                                    root.node_clicked(-1, false);
-
-                                    menu_x = self.mouse-x + 260px;
-                                    menu_y = self.mouse-y;
-                                    menu_visible = true;
-                                }
-                            }
-                        }
                         if (event.kind == PointerEventKind.move) {
                             root.live_mouse_x = self.mouse-x;
                             root.live_mouse_y = self.mouse-y;
                         }
+                        return EventResult.reject;
                     }
 
                     moved => {
@@ -1109,40 +1200,28 @@ export component AppWindow inherits Window {
                             root.drag_x = self.mouse-x / 1px;
                             root.drag_y = self.mouse-y / 1px;
                         }
-                        if (root.is_panning) {
-                            let current_x = self.mouse-x / 1px;
-                            let current_y = self.mouse-y / 1px;
-
-                            root.canvas_pan_x += (current_x - root.pan_start_x) * 1px;
-                            root.canvas_pan_y += (current_y - root.pan_start_y) * 1px;
-                            root.pan_start_x = current_x;
-                            root.pan_start_y = current_y;
-                        }
                     }
 
                     clicked => {
-                        if (root.is_pasting_mode) {
-                            root.canvas_clicked();
-                            root.is_pasting_mode = false; // Drops the nodes!
-                            } else {
-                            menu_visible = false;
+
+                        menu_visible = false;
+                        root.selected_index = -1;
+                        root.select_connection(-1);
+                        ForwardFocus.focus();
+                        root.selected_indexes = [];
+
+                        if (root.is_dragging) {
+
+                            let is_connector = root.drag_name == "A" || root.drag_name == "B";
+                            let shape_w = is_connector ? 60 : 140;
+                            let shape_h = is_connector ? 40 : 40;
+                            let drop_x = root.drag_x;
+                            let drop_y = root.drag_y;
+
+                            root.place_symbol(root.drag_name, root.drag_type, "#0d6efd", drop_x, drop_y, root.active_layout_mode, root.function_node_ip_ports, root.function_node_op_ports);
+                            root.is_dragging = false;
+                        } else if (root.selected_index != -1) {
                             root.selected_index = -1;
-                            root.select_connection(-1);
-                            ForwardFocus.focus();
-                            root.selected_indexes = [];
-
-                            if (root.is_dragging) {
-                                let is_connector = root.drag_name == "A" || root.drag_name == "B";
-                                let shape_w = is_connector ? 60 : 120;
-                                let shape_h = is_connector ? 40 : 40;
-                                let drop_x = root.drag_x;
-                                let drop_y = root.drag_y;
-
-                                root.place_symbol(root.drag_name, root.drag_type, "#0d6efd", drop_x, drop_y, root.active_layout_mode);
-                                root.is_dragging = false;
-                            } else if (root.selected_index != -1) {
-                                root.selected_index = -1;
-                            }
                         }
                     }
 
@@ -1150,8 +1229,9 @@ export component AppWindow inherits Window {
                         property <bool> is_connector: root.drag_name == "A" || root.drag_name == "B";
                         property <bool> is_InputConnector: root.drag_type == "ip_connector";
                         property <bool> is_OutConnector: root.drag_type == "op_connector";
-                        width: is_connector ? 60px : 120px;
-                        height: is_connector ? 40px : 40px;
+                        width: is_connector ? 60px : 140px;
+                        height: is_connector ? 40px : 40px + (root.function_node_ip_ports + root.function_node_op_ports) * 35px;
+
                         x: root.drag_x * 1px - (self.width / 2);
                         y: root.drag_y * 1px - (self.height / 2);
                         opacity: 0.5;
@@ -1173,6 +1253,8 @@ export component AppWindow inherits Window {
                             height: 100%;
                             label: root.drag_name;
                             creation_mode: root.active_layout_mode;
+                            ip_ports: root.function_node_ip_ports;
+                            op_ports: root.function_node_op_ports;
                         }
                     }
                     for item[i] in root.all_symbols: Rectangle {
@@ -1180,10 +1262,11 @@ export component AppWindow inherits Window {
                         property <bool> is_InputConnector: item.node_type == "ip_connector";
                         property <bool> is_OutConnector: item.node_type == "op_connector";
                         property <bool> is_connector: is_InputConnector || is_OutConnector;
-                        width: is_connector ? 60px : 120px;
-                        height: is_connector ? 40px : 40px;
-                        x: item.x * 1px - 60px + root.canvas_pan_x;
-                        y: item.y * 1px - 20px + root.canvas_pan_y;
+                        width: is_connector ? 60px : 140px;
+                        height: is_connector ? 40px : 40px + (item.ip_ports + item.op_ports) * 35px;
+
+                        x: item.x * 1px;
+                        y: item.y * 1px;
 
                         property <bool> node-is-selected: item.is_selected;
 
@@ -1209,10 +1292,20 @@ export component AppWindow inherits Window {
                             }
                         }
                         if (!is_connector): NodeSymbol {
+                            ip_names: item.ip_names;
+                            op_names: item.op_names;
+                            ip_values: item.ip_values;
+                            op_values: item.op_values;
+                            ip_ports: item.ip_ports;
+                            op_ports: item.op_ports;
+                            ip_types: item.ip_types;
+                            op_types: item.op_types;
                             width: 100%;
                             height: 100%;
                             label: item.label == "" ? item.name : item.label;
+                            value: item.value;
                             creation_mode: item.creation_mode;
+
                             port_clicked(is_input, port_name) => {
                                 let final_is_input = (!is_input && (port_name == "left" || port_name == "top")) ? true : is_input;
                                 debug("Port Clicked - Name:", port_name, "| Is Input:", final_is_input);
@@ -1248,6 +1341,7 @@ export component AppWindow inherits Window {
                             }
 
                             clicked => {
+
                                 root.select_connection(-1);
                                 root.selected_index = i;
                                 root.node_clicked(i, control-is-pressed);
@@ -1259,6 +1353,7 @@ export component AppWindow inherits Window {
                                 root.node_clicked(i, false);
                                 root.prevent_placement = true;
                                 root.editing_index = i;
+                                root.request_edit_node(root.editing_index);
                                 root.edit_label = item.label;
                                 root.edit_value = item.value;
                                 root.show_node_modal = true;
@@ -1268,451 +1363,62 @@ export component AppWindow inherits Window {
                             }
                         }
                     }
-
-                    if (root.is_pasting_mode): Rectangle {
-                        background: transparent;
-
-                        for ghost in root.ghost_symbols: Rectangle {
-                            property <bool> is_InputConnector: ghost.node_type == "ip_connector";
-                            property <bool> is_OutputConnector: ghost.node_type == "op_connector";
-                            property <bool> is_connector: is_InputConnector || is_OutputConnector;
-
-                            width: is_connector ? 60px : 120px;
-                            height: 40px;
-                            x: root.live_mouse_x + (ghost.x * 1px);
-                            y: root.live_mouse_y + (ghost.y * 1px);
-
-                            background: #0d6efd.with_alpha(25%);
-                            border-color: #0d6efd;
-                            border-width: 2px;
-                            border-radius: 4px;
-
-                            Text {
-                                text: ghost.label;
-                                color: rgb(40, 40, 50).with_alpha(0.6);
-                                width: 100%;
-                                height: 100%;
-                                horizontal-alignment: center;
-                                vertical-alignment: center;
-                            }
-                        }
-                    }
                 }
 
                 for conn[index] in root.connections: Rectangle {
 
-                    property <bool> isOutputConnector: root.all_symbols[conn.from_index].node_type == "op_connector";
-                    property <bool> isInputConnector: root.all_symbols[conn.to_index].node_type == "ip_connector";
-                    property <float> from_hw: isOutputConnector ? 0 : 60;
-                    property <float> to_hw: isInputConnector ? 60 : 60;
-                    property <float> sx: (conn.from_port == "right") ? (root.all_symbols[conn.from_index].x + from_hw) : (conn.from_port == "left") ? (root.all_symbols[conn.from_index].x - from_hw) : (root.all_symbols[conn.from_index].x);
-                    property <float> sy: (conn.from_port == "right" || conn.from_port == "left") ? (root.all_symbols[conn.from_index].y) : (conn.from_port == "bottom") ? (root.all_symbols[conn.from_index].y + 20) : (root.all_symbols[conn.from_index].y - 20);
-                    property <float> tx: (conn.to_port == "right") ? (root.all_symbols[conn.to_index].x + to_hw) : (conn.to_port == "left") ? (root.all_symbols[conn.to_index].x - to_hw) : (root.all_symbols[conn.to_index].x);
-                    property <float> ty: (conn.to_port == "right" || conn.to_port == "left") ? (root.all_symbols[conn.to_index].y) : (conn.to_port == "bottom") ? (root.all_symbols[conn.to_index].y + 20) : (root.all_symbols[conn.to_index].y - 20);
+                    property <float> node_w: 140;
+                    property <float> node_h: 40;
+                    property <float> port_spacing: 24;
 
+                    property <float> from_half_w: (root.all_symbols[conn.from_index].node_type == "ip_connector" || root.all_symbols[conn.from_index].node_type == "op_connector") ? 30 : 70;
+                    property <float> sx: root.all_symbols[conn.from_index].x + conn.from_port_offset_x;
+                    property <float> sy: root.all_symbols[conn.from_index].y + conn.from_port_offset_y;
+
+                    property <float> tx: root.all_symbols[conn.to_index].x + conn.to_port_offset_x;
+                    property <float> ty: root.all_symbols[conn.to_index].y + conn.to_port_offset_y;
                     property <float> left: Math.min(sx, tx);
                     property <float> top: Math.min(sy, ty);
-                    property <float> pad: 40;
+
+                    property <float> pad: 60;
 
                     property <bool> is_target_above: ty < sy;
 
-                    property <float> pw: Math.max(Math.abs(tx - sx), 1) + (pad * 2);
-                    property <float> ph: (Math.max(Math.abs(ty - sy), 1) + (pad * 2)) + (is_target_above ? 40 : 0);
+                    property <float> pw: Math.max(Math.abs(tx - sx), 140) + (pad * 2);
+                    property <float> ph: Math.max(Math.abs(ty - sy), 80) + (pad * 2);
 
-                    x: (left - pad) * 1px + root.canvas_pan_x;
-                    y: (top - pad) * 1px + root.canvas_pan_y;
+                    x: (left - pad) * 1px;
+                    y: (top - pad) * 1px;
                     width: pw * 1px;
                     height: ph * 1px;
                     background: transparent;
                     z: 1;
 
                     Rectangle {
-                        property <float> local_sx: (sx - left + pad) + 3;
-                        property <float> local_sy: sy - top + pad;
-                        property <float> local_tx: tx - left + pad;
-                        property <float> local_ty: (ty - top + pad) - 2;
-
-                        property <float> center_offset: -2;
-                        property <float> adjusted_sy: local_sy + center_offset + 2;
-
-                        property <bool> is_target_above: ty < sy;
-                        property <bool> is_target_left: tx < sx;
-                        property <bool> is_straight_vertical: Math.abs(local_sx - local_tx) < 2;
-
-                        property <float> wp_x1: is_straight_vertical ? local_tx : (local_sx + 25);
-
-                        property <float> wp_y1: is_straight_vertical ? local_ty : (is_target_left ? (is_target_above ? (local_ty - 30) : (local_sy + 40)) : (is_target_above ? (local_ty - 30) : (adjusted_sy + (local_ty - adjusted_sy) / 2)));
-
-                        property <float> wp_x2: local_tx + 1;
-                        property <float> thick: 16.0;
-
-                        Path {
-                            visible: (conn.from_port == "right" && conn.to_port == "top");
-                            width: parent.width;
-                            height: parent.height;
-                            viewbox-x: 0;
-                            viewbox-y: 0;
-                            viewbox-width: pw;
-                            viewbox-height: ph;
-                            fill: transparent;
-                            stroke: orange;
-                            stroke-width: conn.selected ? 3px : 2px;
-
-                            MoveTo {
-                                x: local_sx;
-                                y: adjusted_sy;
-                            }
-
-                            LineTo {
-                                x: wp_x1;
-                                y: adjusted_sy;
-                            }
-
-                            LineTo {
-                                x: wp_x1;
-                                y: wp_y1;
-                            }
-
-                            LineTo {
-                                x: wp_x2;
-                                y: wp_y1;
-                            }
-
-                            LineTo {
-                                x: wp_x2;
-                                y: local_ty;
-                            }
-                        }
-
-                        if (conn.from_port == "right" && conn.to_port == "top"): Rectangle {
-                            background: transparent;
-
-                            Rectangle {
-                                x: Math.min(local_sx, wp_x1) * 1px;
-                                y: adjusted_sy * 1px - (thick / 2) * 1px;
-                                width: (Math.abs(wp_x1 - local_sx) + 1.0) * 1px;
-                                height: thick * 1px;
-                                background: transparent;
-                                TouchArea {
-                                    pointer-event(evt) => {
-                                        if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
-                                            root.select_connection(index);
-                                            root.selected_index = -1;
-                                            active_node_index = index;
-
-                                            menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
-                                            menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
-
-                                            menu_visible = true;
-                                            return EventResult.accept;
-                                        }
-                                        return EventResult.reject;
-                                    }
-                                    clicked => {
-                                        root.active_selection_mode = "connection";
-                                        root.select_connection(index);
-                                        root.selected_index = -1;
-                                        menu_visible = false;
-                                    }
-                                }
-                            }
-
-                            Rectangle {
-                                x: wp_x1 * 1px - (thick / 2) * 1px;
-                                y: Math.min(adjusted_sy, wp_y1) * 1px;
-                                width: thick * 1px;
-                                height: (Math.abs(wp_y1 - adjusted_sy) + 1.0) * 1px;
-                                background: transparent;
-                                TouchArea {
-                                    pointer-event(evt) => {
-                                        if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
-                                            root.select_connection(index);
-                                            root.selected_index = -1;
-                                            active_node_index = index;
-
-                                            menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
-                                            menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
-
-                                            menu_visible = true;
-                                            return EventResult.accept;
-                                        }
-                                        return EventResult.reject;
-                                    }
-                                    clicked => {
-                                        root.active_selection_mode = "connection";
-                                        root.select_connection(index);
-                                        root.selected_index = -1;
-                                        menu_visible = false;
-                                    }
-                                }
-                            }
-
-                            Rectangle {
-                                x: Math.min(wp_x1, wp_x2) * 1px;
-                                y: wp_y1 * 1px - (thick / 2) * 1px;
-                                width: (Math.abs(wp_x2 - wp_x1) + 1.0) * 1px;
-                                height: thick * 1px;
-                                background: transparent;
-                                TouchArea {
-                                    pointer-event(evt) => {
-                                        if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
-                                            root.select_connection(index);
-                                            root.selected_index = -1;
-                                            active_node_index = index;
-
-                                            menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
-                                            menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
-
-                                            menu_visible = true;
-                                            return EventResult.accept;
-                                        }
-                                        return EventResult.reject;
-                                    }
-                                    clicked => {
-                                        root.active_selection_mode = "connection";
-                                        root.select_connection(index);
-                                        root.selected_index = -1;
-                                        menu_visible = false;
-                                    }
-                                }
-                            }
-
-                            Rectangle {
-                                x: wp_x2 * 1px - (thick / 2) * 1px;
-                                y: Math.min(wp_y1, local_ty) * 1px;
-                                width: thick * 1px;
-                                height: (Math.abs(local_ty - wp_y1) + 1.0) * 1px;
-                                background: transparent;
-                                TouchArea {
-                                    pointer-event(evt) => {
-                                        if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
-                                            root.select_connection(index);
-                                            root.selected_index = -1;
-                                            active_node_index = index;
-
-                                            menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
-                                            menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
-
-                                            menu_visible = true;
-                                            return EventResult.accept;
-                                        }
-                                        return EventResult.reject;
-                                    }
-                                    clicked => {
-                                        root.active_selection_mode = "connection";
-                                        root.select_connection(index);
-                                        root.selected_index = -1;
-                                        menu_visible = false;
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    Rectangle {
-
                         property <bool> is_forward: tx >= sx;
-                        property <float> local_sx: (sx - left + pad) + 2;
-                        property <float> local_sy: sy - top + pad + 3;
-                        property <float> local_tx: tx - left + pad - 3;
-                        property <float> local_ty: ty - top + pad - 2;
-                        property <float> center_offset: -2;
-                        property <float> adjusted_sy: local_sy + center_offset;
-                        property <float> adjusted_ty: local_ty + center_offset + 2;
-
-                        property <bool> is_straight_line: Math.abs(local_sx - local_tx) < 2;
-
-                        property <float> wp_y1: is_straight_line ? adjusted_ty : (local_sy + 40);
-                        property <float> wp_x: is_straight_line ? local_tx : (local_tx - 40);
-                        property <float> target_y: is_straight_line ? adjusted_ty : (adjusted_ty + 1);
-
-                        property <float> thick: 16.0;
-
-                        Path {
-                            visible: (conn.from_port == "bottom" && conn.to_port == "left");
-                            width: parent.width;
-                            height: parent.height;
-                            viewbox-x: 0;
-                            viewbox-y: 0;
-                            viewbox-width: pw;
-                            viewbox-height: ph;
-                            fill: transparent;
-                            stroke: orange;
-                            stroke-width: conn.selected ? 3px : 2px;
-
-                            MoveTo {
-                                x: local_sx;
-                                y: local_sy;
-                            }
-
-                            LineTo {
-                                x: local_sx;
-                                y: wp_y1;
-                            }
-
-                            LineTo {
-                                x: wp_x;
-                                y: wp_y1;
-                            }
-
-                            LineTo {
-                                x: wp_x;
-                                y: is_straight_line ? adjusted_ty : (adjusted_ty + 1);
-                            }
-
-                            LineTo {
-                                x: local_tx;
-                                y: is_straight_line ? adjusted_ty : (adjusted_ty + 1);
-                            }
-                        }
-
-                        if (conn.from_port == "bottom" && conn.to_port == "left"): Rectangle {
-                            background: transparent;
-
-                            Rectangle {
-                                x: local_sx * 1px - (thick / 2) * 1px;
-                                y: Math.min(local_sy, wp_y1) * 1px;
-                                width: thick * 1px;
-                                height: (Math.abs(wp_y1 - local_sy) + 1.0) * 1px;
-                                background: transparent;
-                                TouchArea {
-                                    pointer-event(evt) => {
-                                        if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
-                                            root.select_connection(index);
-                                            root.selected_index = -1;
-                                            active_node_index = index;
-
-                                            menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
-                                            menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
-
-                                            menu_visible = true;
-                                            return EventResult.accept;
-                                        }
-                                        return EventResult.reject;
-                                    }
-                                    clicked => {
-                                        root.active_selection_mode = "connection";
-                                        root.select_connection(index);
-                                        root.selected_index = -1;
-                                        menu_visible = false;
-                                    }
-                                }
-                            }
-
-                            Rectangle {
-                                x: Math.min(local_sx, wp_x) * 1px;
-                                y: wp_y1 * 1px - (thick / 2) * 1px;
-                                width: (Math.abs(wp_x - local_sx) + 1.0) * 1px;
-                                height: thick * 1px;
-                                background: transparent;
-                                TouchArea {
-                                    pointer-event(evt) => {
-                                        if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
-                                            root.select_connection(index);
-                                            root.selected_index = -1;
-                                            active_node_index = index;
-
-                                            menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
-                                            menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
-
-                                            menu_visible = true;
-                                            return EventResult.accept;
-                                        }
-                                        return EventResult.reject;
-                                    }
-                                    clicked => {
-                                        root.active_selection_mode = "connection";
-                                        root.select_connection(index);
-                                        root.selected_index = -1;
-                                        menu_visible = false;
-                                    }
-                                }
-                            }
-
-                            Rectangle {
-                                x: wp_x * 1px - (thick / 2) * 1px;
-                                y: Math.min(wp_y1, target_y) * 1px;
-                                width: thick * 1px;
-                                height: (Math.abs(target_y - wp_y1) + 1.0) * 1px;
-                                background: transparent;
-                                TouchArea {
-                                    pointer-event(evt) => {
-                                        if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
-                                            root.select_connection(index);
-                                            root.selected_index = -1;
-                                            active_node_index = index;
-
-                                            menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
-                                            menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
-
-                                            menu_visible = true;
-                                            return EventResult.accept;
-                                        }
-                                        return EventResult.reject;
-                                    }
-                                    clicked => {
-                                        root.active_selection_mode = "connection";
-                                        root.select_connection(index);
-                                        root.selected_index = -1;
-                                        menu_visible = false;
-                                    }
-                                }
-                            }
-
-                            Rectangle {
-                                x: Math.min(wp_x, local_tx) * 1px;
-                                y: target_y * 1px - (thick / 2) * 1px;
-                                width: (Math.abs(local_tx - wp_x) + 1.0) * 1px;
-                                height: thick * 1px;
-                                background: transparent;
-                                TouchArea {
-                                    pointer-event(evt) => {
-                                        if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
-                                            root.select_connection(index);
-                                            root.selected_index = -1;
-                                            active_node_index = index;
-
-                                            menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
-                                            menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
-
-                                            menu_visible = true;
-                                            return EventResult.accept;
-                                        }
-                                        return EventResult.reject;
-                                    }
-                                    clicked => {
-                                        root.active_selection_mode = "connection";
-                                        root.select_connection(index);
-                                        root.selected_index = -1;
-                                        menu_visible = false;
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    Rectangle {
-
-                        property <bool> is_forward: tx >= sx;
-                        property <float> local_sx: (sx - left + pad) + 4;
+                        property <float> local_sx: (sx - left + pad);
                         property <float> local_sy: sy - top + pad;
-                        property <float> local_tx: (tx - left + pad) - 4;
+                        property <float> local_tx: (tx - left + pad);
                         property <float> local_ty: ty - top + pad;
                         property <float> center_offset: -2;
                         property <float> adjusted_sy: local_sy + center_offset + 2;
                         property <float> adjusted_ty: local_ty + center_offset + 2;
-                        property <bool> is_mixed_route: (conn.from_port == "right" || conn.from_port == "left") && (conn.to_port == "top" || conn.to_port == "bottom");
-                        property <bool> is_straight_line: Math.abs(adjusted_sy - adjusted_ty) < 2;
 
-                        property <float> wp_x1: is_mixed_route ? (local_sx + 40) : (is_forward ? (local_sx + (local_tx - local_sx) / 2) : (local_sx + 40));
-                        property <float> wp_y: is_straight_line ? adjusted_sy : (is_mixed_route ? (adjusted_sy + (adjusted_ty - adjusted_sy) / 2) : (is_forward ? adjusted_ty : (adjusted_sy + (adjusted_ty - adjusted_sy) / 2)));
-                        property <float> wp_x2: is_mixed_route ? local_tx : (is_forward ? (local_sx + (local_tx - local_sx) / 2) : (local_tx - 40));
+                        property <bool> is_vertical_flow: (Math.abs(conn.from_port_offset_y) < 2.0 || Math.abs(conn.from_port_offset_y - 40.0) < 2.0) && (Math.abs(conn.to_port_offset_y) < 2.0 || Math.abs(conn.to_port_offset_y - 40.0) < 2.0);
+                        property <bool> is_straight_line: is_vertical_flow ? (Math.abs(local_sx - local_tx) < 2) : (Math.abs(adjusted_sy - adjusted_ty) < 2);
+
+                        property <float> mid_x: local_sx + (local_tx - local_sx) / 2;
+                        property <float> mid_y: adjusted_sy + (adjusted_ty - adjusted_sy) / 2;
+
+                        property <float> wp_x1: is_vertical_flow ? local_sx : (is_forward ? mid_x : (local_sx + 40));
+                        property <float> wp_y: is_vertical_flow ? mid_y : (is_straight_line ? adjusted_sy : (is_forward ? adjusted_ty : mid_y));
+                        property <float> wp_x2: is_vertical_flow ? local_tx : (is_forward ? mid_x : (local_tx - 40));
 
                         property <float> thick: 16.0;
                         property <float> seg45_y: is_straight_line ? adjusted_sy : adjusted_ty;
 
                         Path {
-                            visible: (conn.from_port == "right" && conn.to_port == "left");
+                            visible: conn.from_index != -1 && conn.to_index != -1;
                             width: parent.width;
                             height: parent.height;
                             viewbox-x: 0;
@@ -1729,23 +1435,18 @@ export component AppWindow inherits Window {
                             }
 
                             LineTo {
-                                x: wp_x1;
-                                y: adjusted_sy;
+                                x: is_vertical_flow ? local_sx : wp_x1;
+                                y: is_vertical_flow ? mid_y : adjusted_sy;
                             }
 
                             LineTo {
-                                x: wp_x1;
-                                y: wp_y;
+                                x: is_vertical_flow ? local_tx : wp_x2;
+                                y: is_vertical_flow ? mid_y : wp_y;
                             }
 
                             LineTo {
-                                x: wp_x2;
-                                y: wp_y;
-                            }
-
-                            LineTo {
-                                x: wp_x2;
-                                y: is_straight_line ? adjusted_sy : adjusted_ty;
+                                x: local_tx;
+                                y: is_vertical_flow ? adjusted_ty : wp_y;
                             }
 
                             LineTo {
@@ -1754,28 +1455,29 @@ export component AppWindow inherits Window {
                             }
                         }
 
+                        init => {
+                            debug("from offset x=" + conn.from_port_offset_x);
+                            debug("from offset y=" + conn.from_port_offset_y);
+
+                            debug("to offset x=" + conn.to_port_offset_x);
+                            debug("to offset y=" + conn.to_port_offset_y);
+                            debug("Node X = " + root.all_symbols[conn.from_index].x);
+                            debug("Node Y = " + root.all_symbols[conn.from_index].y);
+
+                            debug("SX = " + sx);
+                            debug("SY = " + sy);
+                            debug("Draw Node " + index);
+                            debug("Parent X = " + self.x / 1px);
+                            debug("Parent Y = " + self.y / 1px);
+                        }
+
                         Rectangle {
                             x: Math.min(local_sx, wp_x1) * 1px;
-                            y: adjusted_sy * 1px - (thick / 2) * 1px;
-                            width: (Math.abs(wp_x1 - local_sx) + 1.0) * 1px;
-                            height: thick * 1px;
+                            y: (is_vertical_flow ? Math.min(adjusted_sy, mid_y) : adjusted_sy) * 1px - (thick / 2) * 1px;
+                            width: (is_vertical_flow ? thick : (Math.abs(wp_x1 - local_sx) + 1.0)) * 1px;
+                            height: (is_vertical_flow ? (Math.abs(mid_y - adjusted_sy) + 1.0) : thick) * 1px;
                             background: transparent;
-
                             TouchArea {
-                                pointer-event(evt) => {
-                                    if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
-                                        root.select_connection(index);
-                                        root.selected_index = -1;
-                                        active_node_index = index;
-
-                                        menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
-                                        menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
-
-                                        menu_visible = true;
-                                        return EventResult.accept;
-                                    }
-                                    return EventResult.reject;
-                                }
                                 clicked => {
                                     root.active_selection_mode = "connection";
                                     root.select_connection(index);
@@ -1786,26 +1488,12 @@ export component AppWindow inherits Window {
                         }
 
                         Rectangle {
-                            x: wp_x1 * 1px - (thick / 2) * 1px;
-                            y: Math.min(adjusted_sy, wp_y) * 1px;
-                            width: thick * 1px;
-                            height: (Math.abs(wp_y - adjusted_sy) + 1.0) * 1px;
+                            x: (is_vertical_flow ? Math.min(local_sx, local_tx) : wp_x1) * 1px - (is_vertical_flow ? 0px : (thick / 2) * 1px);
+                            y: (is_vertical_flow ? mid_y : Math.min(adjusted_sy, wp_y)) * 1px - (is_vertical_flow ? (thick / 2) * 1px : 0px);
+                            width: (is_vertical_flow ? (Math.abs(local_tx - local_sx) + 1.0) : thick) * 1px;
+                            height: (is_vertical_flow ? thick : (Math.abs(wp_y - adjusted_sy) + 1.0)) * 1px;
                             background: transparent;
                             TouchArea {
-                                pointer-event(evt) => {
-                                    if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
-                                        root.select_connection(index);
-                                        root.selected_index = -1;
-                                        active_node_index = index;
-
-                                        menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
-                                        menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
-
-                                        menu_visible = true;
-                                        return EventResult.accept;
-                                    }
-                                    return EventResult.reject;
-                                }
                                 clicked => {
                                     root.active_selection_mode = "connection";
                                     root.select_connection(index);
@@ -1816,26 +1504,12 @@ export component AppWindow inherits Window {
                         }
 
                         Rectangle {
-                            x: Math.min(wp_x1, wp_x2) * 1px;
-                            y: wp_y * 1px - (thick / 2) * 1px;
-                            width: (Math.abs(wp_x2 - wp_x1) + 1.0) * 1px;
-                            height: thick * 1px;
+                            x: (is_vertical_flow ? local_tx : Math.min(wp_x1, wp_x2)) * 1px - (thick / 2) * 1px;
+                            y: (is_vertical_flow ? Math.min(mid_y, adjusted_ty) : wp_y) * 1px - (is_vertical_flow ? 0px : (thick / 2) * 1px);
+                            width: (is_vertical_flow ? thick : (Math.abs(wp_x2 - wp_x1) + 1.0)) * 1px;
+                            height: (is_vertical_flow ? (Math.abs(adjusted_ty - mid_y) + 1.0) : thick) * 1px;
                             background: transparent;
                             TouchArea {
-                                pointer-event(evt) => {
-                                    if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
-                                        root.select_connection(index);
-                                        root.selected_index = -1;
-                                        active_node_index = index;
-
-                                        menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
-                                        menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
-
-                                        menu_visible = true;
-                                        return EventResult.accept;
-                                    }
-                                    return EventResult.reject;
-                                }
                                 clicked => {
                                     root.active_selection_mode = "connection";
                                     root.select_connection(index);
@@ -1846,26 +1520,13 @@ export component AppWindow inherits Window {
                         }
 
                         Rectangle {
+                            visible: !is_vertical_flow;
                             x: wp_x2 * 1px - (thick / 2) * 1px;
                             y: Math.min(wp_y, seg45_y) * 1px;
                             width: thick * 1px;
                             height: (Math.abs(seg45_y - wp_y) + 1.0) * 1px;
                             background: transparent;
                             TouchArea {
-                                pointer-event(evt) => {
-                                    if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
-                                        root.select_connection(index);
-                                        root.selected_index = -1;
-                                        active_node_index = index;
-
-                                        menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
-                                        menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
-
-                                        menu_visible = true;
-                                        return EventResult.accept;
-                                    }
-                                    return EventResult.reject;
-                                }
                                 clicked => {
                                     root.active_selection_mode = "connection";
                                     root.select_connection(index);
@@ -1876,387 +1537,18 @@ export component AppWindow inherits Window {
                         }
 
                         Rectangle {
+                            visible: !is_vertical_flow;
                             x: Math.min(wp_x2, local_tx) * 1px;
                             y: seg45_y * 1px - (thick / 2) * 1px;
                             width: (Math.abs(local_tx - wp_x2) + 1.0) * 1px;
                             height: thick * 1px;
                             background: transparent;
                             TouchArea {
-                                pointer-event(evt) => {
-                                    if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
-                                        root.select_connection(index);
-                                        root.selected_index = -1;
-                                        active_node_index = index;
-
-                                        menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
-                                        menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
-
-                                        menu_visible = true;
-                                        return EventResult.accept;
-                                    }
-                                    return EventResult.reject;
-                                }
                                 clicked => {
                                     root.active_selection_mode = "connection";
                                     root.select_connection(index);
                                     root.selected_index = -1;
                                     menu_visible = false;
-                                }
-                            }
-                        }
-                    }
-
-                    Rectangle {
-
-                        property <float> local_sx: sx - left + pad;
-                        property <float> local_sy: (sy - top + pad) + 3;
-                        property <float> local_tx: tx - left + pad;
-                        property <float> local_ty: (ty - top + pad) - 3;
-
-                        property <float> adjusted_sx: local_sx;
-                        property <float> adjusted_tx: local_tx;
-                        property <float> adjusted_ty: local_ty;
-
-                        property <bool> is_straight_vertical: Math.abs(adjusted_sx - adjusted_tx) < 2;
-                        property <bool> is_target_above: ty < sy;
-
-                        property <float> wp_y1: is_straight_vertical ? adjusted_ty : (is_target_above ? (local_sy + 40) : (local_sy + (adjusted_ty - local_sy) / 2));
-                        property <float> side_offset: (is_straight_vertical || !is_target_above) ? 0 : 90;
-                        property <float> approach_offset: (is_straight_vertical || !is_target_above) ? 0 : -30;
-
-                        property <float> seg23_x: is_straight_vertical ? adjusted_tx : (adjusted_tx + side_offset);
-                        property <float> seg34_y: is_straight_vertical ? adjusted_ty : (adjusted_ty + approach_offset);
-                        property <float> thick: 16.0;
-
-                        Path {
-                            visible: (conn.from_port == "bottom" && conn.to_port == "top");
-                            width: parent.width;
-                            height: parent.height;
-                            viewbox-x: 0;
-                            viewbox-y: 0;
-                            viewbox-width: pw;
-                            viewbox-height: ph;
-                            fill: transparent;
-                            stroke: orange;
-                            stroke-width: conn.selected ? 3px : 2px;
-
-                            MoveTo {
-                                x: adjusted_sx;
-                                y: local_sy;
-                            }
-
-                            LineTo {
-                                x: adjusted_sx;
-                                y: wp_y1;
-                            }
-
-                            LineTo {
-                                x: seg23_x;
-                                y: wp_y1;
-                            }
-
-                            LineTo {
-                                x: seg23_x;
-                                y: seg34_y;
-                            }
-
-                            LineTo {
-                                x: adjusted_tx;
-                                y: seg34_y;
-                            }
-
-                            LineTo {
-                                x: adjusted_tx;
-                                y: adjusted_ty;
-                            }
-                        }
-
-                        Rectangle {
-                            x: adjusted_sx * 1px - (thick / 2) * 1px;
-                            y: Math.min(local_sy, wp_y1) * 1px;
-                            width: thick * 1px;
-                            height: (Math.abs(wp_y1 - local_sy) + 1.0) * 1px;
-                            background: transparent;
-                            TouchArea {
-                                pointer-event(evt) => {
-                                    if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
-                                        root.select_connection(index);
-                                        root.selected_index = -1;
-                                        active_node_index = index;
-
-                                        menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
-                                        menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
-
-                                        menu_visible = true;
-                                        return EventResult.accept;
-                                    }
-                                    return EventResult.reject;
-                                }
-                                clicked => {
-                                    root.active_selection_mode = "connection";
-                                    root.select_connection(index);
-                                    root.selected_index = -1;
-                                    menu_visible = false;
-                                }
-                            }
-                        }
-
-                        Rectangle {
-                            x: Math.min(adjusted_sx, seg23_x) * 1px;
-                            y: wp_y1 * 1px - (thick / 2) * 1px;
-                            width: (Math.abs(seg23_x - adjusted_sx) + 1.0) * 1px;
-                            height: thick * 1px;
-                            background: transparent;
-                            TouchArea {
-                                pointer-event(evt) => {
-                                    if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
-                                        root.select_connection(index);
-                                        root.selected_index = -1;
-                                        active_node_index = index;
-
-                                        menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
-                                        menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
-
-                                        menu_visible = true;
-                                        return EventResult.accept;
-                                    }
-                                    return EventResult.reject;
-                                }
-                                clicked => {
-                                    root.active_selection_mode = "connection";
-                                    root.select_connection(index);
-                                    root.selected_index = -1;
-                                    menu_visible = false;
-                                }
-                            }
-                        }
-
-                        Rectangle {
-                            x: seg23_x * 1px - (thick / 2) * 1px;
-                            y: Math.min(wp_y1, seg34_y) * 1px;
-                            width: thick * 1px;
-                            height: (Math.abs(seg34_y - wp_y1) + 1.0) * 1px;
-                            background: transparent;
-                            TouchArea {
-                                pointer-event(evt) => {
-                                    if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
-                                        root.select_connection(index);
-                                        root.selected_index = -1;
-                                        active_node_index = index;
-
-                                        menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
-                                        menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
-
-                                        menu_visible = true;
-                                        return EventResult.accept;
-                                    }
-                                    return EventResult.reject;
-                                }
-                                clicked => {
-                                    root.active_selection_mode = "connection";
-                                    root.select_connection(index);
-                                    root.selected_index = -1;
-                                    menu_visible = false;
-                                }
-                            }
-                        }
-
-                        Rectangle {
-                            x: Math.min(seg23_x, adjusted_tx) * 1px;
-                            y: seg34_y * 1px - (thick / 2) * 1px;
-                            width: (Math.abs(adjusted_tx - seg23_x) + 1.0) * 1px;
-                            height: thick * 1px;
-                            background: transparent;
-                            TouchArea {
-                                pointer-event(evt) => {
-                                    if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
-                                        root.select_connection(index);
-                                        root.selected_index = -1;
-                                        active_node_index = index;
-
-                                        menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
-                                        menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
-
-                                        menu_visible = true;
-                                        return EventResult.accept;
-                                    }
-                                    return EventResult.reject;
-                                }
-                                clicked => {
-                                    root.active_selection_mode = "connection";
-                                    root.select_connection(index);
-                                    root.selected_index = -1;
-                                    menu_visible = false;
-                                }
-                            }
-                        }
-
-                        Rectangle {
-                            x: adjusted_tx * 1px - (thick / 2) * 1px;
-                            y: Math.min(seg34_y, adjusted_ty) * 1px;
-                            width: thick * 1px;
-                            height: (Math.abs(adjusted_ty - seg34_y) + 1.0) * 1px;
-                            background: transparent;
-                            TouchArea {
-                                pointer-event(evt) => {
-                                    if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
-                                        root.select_connection(index);
-                                        root.selected_index = -1;
-                                        active_node_index = index;
-
-                                        menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
-                                        menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
-
-                                        menu_visible = true;
-                                        return EventResult.accept;
-                                    }
-                                    return EventResult.reject;
-                                }
-                                clicked => {
-                                    root.active_selection_mode = "connection";
-                                    root.select_connection(index);
-                                    root.selected_index = -1;
-                                    menu_visible = false;
-                                }
-                            }
-                        }
-                    }
-
-                    Rectangle {
-
-                        property <float> local_sx: sx - left + pad;
-                        property <float> local_sy: sy - top + pad;
-                        property <float> local_tx: tx - left + pad;
-                        property <float> local_ty: ty - top + pad;
-
-                        property <bool> is_straight_vertical: Math.abs(local_sx - local_tx) < 2;
-
-                        property <float> midpoint_y: local_sy + (local_ty - local_sy) / 2;
-                        property <float> thick: 16.0;
-
-                        Path {
-                            visible: (conn.from_port == "top" && conn.to_port == "bottom");
-                            width: parent.width;
-                            height: parent.height;
-                            viewbox-x: 0;
-                            viewbox-y: 0;
-                            viewbox-width: pw;
-                            viewbox-height: ph;
-                            fill: transparent;
-                            stroke: orange;
-                            stroke-width: conn.selected ? 3px : 2px;
-
-                            MoveTo {
-                                x: local_sx;
-                                y: local_sy;
-                            }
-
-                            LineTo {
-                                x: local_sx;
-                                y: midpoint_y;
-                            }
-
-                            LineTo {
-                                x: local_tx;
-                                y: midpoint_y;
-                            }
-
-                            LineTo {
-                                x: local_tx;
-                                y: local_ty;
-                            }
-                        }
-
-                        if (conn.from_port == "top" && conn.to_port == "bottom"): Rectangle {
-                            background: transparent;
-
-                            Rectangle {
-                                x: local_sx * 1px - (thick / 2) * 1px;
-                                y: Math.min(local_sy, midpoint_y) * 1px;
-                                width: thick * 1px;
-                                height: (Math.abs(midpoint_y - local_sy) + 1.0) * 1px;
-                                background: transparent;
-                                TouchArea {
-                                    pointer-event(evt) => {
-                                        if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
-                                            root.select_connection(index);
-                                            root.selected_index = -1;
-                                            active_node_index = index;
-
-                                            menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
-                                            menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
-
-                                            menu_visible = true;
-                                            return EventResult.accept;
-                                        }
-                                        return EventResult.reject;
-                                    }
-                                    clicked => {
-                                        root.active_selection_mode = "connection";
-                                        root.select_connection(index);
-                                        root.selected_index = -1;
-                                        menu_visible = false;
-                                    }
-                                }
-                            }
-
-                            Rectangle {
-                                x: Math.min(local_sx, local_tx) * 1px;
-                                y: midpoint_y * 1px - (thick / 2) * 1px;
-                                width: (Math.abs(local_tx - local_sx) + 1.0) * 1px;
-                                height: thick * 1px;
-                                background: transparent;
-                                TouchArea {
-                                    pointer-event(evt) => {
-                                        if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
-                                            root.select_connection(index);
-                                            root.selected_index = -1;
-                                            active_node_index = index;
-
-                                            menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
-                                            menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
-
-                                            menu_visible = true;
-                                            return EventResult.accept;
-                                        }
-                                        return EventResult.reject;
-                                    }
-                                    clicked => {
-                                        root.active_selection_mode = "connection";
-                                        root.select_connection(index);
-                                        root.selected_index = -1;
-                                        menu_visible = false;
-                                    }
-                                }
-                            }
-
-                            Rectangle {
-                                x: local_tx * 1px - (thick / 2) * 1px;
-                                y: Math.min(midpoint_y, local_ty) * 1px;
-                                width: thick * 1px;
-                                height: (Math.abs(local_ty - midpoint_y) + 1.0) * 1px;
-                                background: transparent;
-                                TouchArea {
-                                    pointer-event(evt) => {
-                                        if (evt.button == PointerEventButton.right && evt.kind == PointerEventKind.down) {
-                                            root.select_connection(index);
-                                            root.selected_index = -1;
-                                            active_node_index = index;
-
-                                            menu_x = self.mouse-x + parent.x + left * 1px - pad * 1px + root.canvas_pan_x + 260px;
-                                            menu_y = self.mouse-y + parent.y + top * 1px - pad * 1px + root.canvas_pan_y;
-
-                                            menu_visible = true;
-                                            return EventResult.accept;
-                                        }
-                                        return EventResult.reject;
-                                    }
-                                    clicked => {
-                                        root.active_selection_mode = "connection";
-                                        root.select_connection(index);
-                                        root.selected_index = -1;
-                                        menu_visible = false;
-                                    }
                                 }
                             }
                         }
@@ -2506,6 +1798,230 @@ export component AppWindow inherits Window {
     }
 
     if (root.show_node_modal): Rectangle {
+
+        width: parent.width;
+        height: parent.height;
+        background: #00000066;
+        border-radius: 6px;
+        TouchArea { }
+
+        Rectangle {
+            width: 520px;
+            height: 480px;
+            background: white;
+            border-radius: 6px;
+            border-width: 1px;
+            border-color: #dcdcdc;
+            clip: true;
+
+            VerticalLayout {
+                padding: 8px;
+                spacing: 6px;
+
+                 Rectangle {
+                            background: #dbe7f4;
+                            border-radius: 6px;
+                            border-width: 1px;
+                            border-color: #b0e6f8;
+
+                            VerticalLayout {
+                                padding: 8px;
+                                spacing: 6px;
+
+                                HorizontalLayout {
+                                    Text {
+                                        text: "Node Details";
+                                        font-size: 12px;
+                                        font-weight: 600;
+                                    }
+                                }
+
+                                HorizontalLayout {
+                                    spacing: 4px;
+                                    LineEdit {
+                                        placeholder-text: "Node Name";
+                                        text: root.edit_label;
+
+                                        edited => {
+                                            root.edit_label = self.text;
+                                        }
+                                    }
+
+                                    LineEdit {
+                                        placeholder-text: "Node Value";
+                                        text: root.edit_value;
+
+                                        edited => {
+                                            root.edit_value = self.text;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                ScrollView {
+
+                    height: 350px;
+
+                        VerticalLayout {
+
+                        spacing: 10px;
+
+                        Rectangle {
+                            background: #edf9ef;
+                            border-radius: 6px;
+                            border-width: 1px;
+                            border-color: #d8f0dd;
+
+                            VerticalLayout {
+                                padding: 8px;
+                                spacing: 6px;
+
+                                HorizontalLayout {
+                                    Text {
+                                        text: "Input Ports";
+                                        font-size: 12px;
+                                        font-weight: 600;
+                                    }
+
+                                    Rectangle { }
+
+                                    Button {
+                                        text: "+ Add";
+
+                                        clicked => {
+                                            root.add_ip_port();
+                                        }
+                                    }
+                                }
+
+                                for i in root.ip_names.length: HorizontalLayout {
+                                    spacing: 4px;
+
+                                    ComboBox {
+                                        model: ["Number", "String"];
+                                        current-value: root.ip_types[i];
+                                        selected(val) => {
+                                            root.ip_types[i] = val;
+                                        }
+                                    }
+
+                                    LineEdit {
+                                        placeholder-text: "Name";
+                                        text: root.ip_names[i];
+
+                                        edited => {
+                                            root.ip_names[i] = self.text;
+                                        }
+                                    }
+
+                                    LineEdit {
+                                        text: ip_values[i];
+
+                                        edited(val) => { ip_values[i] = val; }
+                                    }
+                                }
+                            }
+                        }
+
+                        Rectangle {
+
+                            background: #e5f4f9;
+                            border-radius: 6px;
+                            border-width: 1px;
+                            border-color: #bae4fa;
+                            VerticalLayout {
+                                padding: 8px;
+                                spacing: 6px;
+
+                                HorizontalLayout {
+                                    Text {
+                                        text: "Output Ports";
+                                        font-size: 12px;
+                                        font-weight: 600;
+                                    }
+
+                                    Rectangle { }
+
+                                    Button {
+                                        text: "+ Add";
+
+                                        clicked => {
+                                            root.add_op_port();
+                                        }
+                                    }
+                                }
+
+                                for i in root.op_names.length: HorizontalLayout {
+                                    spacing: 4px;
+
+                                    ComboBox {
+                                        model: ["Number", "String"];
+                                        current-value: root.op_types[i];
+                                        selected(val) => {
+                                            root.op_types[i] = val;
+                                        }
+                                    }
+
+                                    LineEdit {
+                                        placeholder-text: "Name";
+                                        text: op_names[i];
+
+                                        edited => {
+                                            op_names[i] = self.text;
+                                        }
+                                    }
+
+                                    LineEdit {
+                                        placeholder-text: "Value";
+                                        text: op_values[i];
+
+                                        edited => {
+                                            op_values[i] = self.text;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Rectangle { }
+                    }
+                }
+
+                HorizontalLayout {
+                    spacing: 8px;
+
+                    Rectangle { }
+
+                    Button {
+                        text: "Cancel";
+
+                        clicked => {
+                            root.show_node_modal = false;
+                        }
+                    }
+
+                    Button {
+                        text: "Save";
+                        primary: true;
+                        clicked => {
+
+                            if (root.save_node_properties(        root.editing_index,        root.ip_ports,        root.op_ports,        root.edit_label,        root.ip_names,        root.ip_values,        root.op_names,        root.op_values,        root.ip_types,        root.op_types)) {
+
+                                root.function_node_ip_ports = root.ip_ports;
+
+                                root.function_node_op_ports = root.op_ports;
+
+                                root.show_node_modal = false;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (root.show_port_configuration_modal): Rectangle {
         width: parent.width;
         height: parent.height;
         background: #00000044;
@@ -2526,7 +2042,7 @@ export component AppWindow inherits Window {
                 spacing: 16px;
 
                 Text {
-                    text: "Edit Node Properties";
+                    text: "Port Configuration";
                     font-size: 16px;
                     font-weight: 700;
                     color: #222222;
@@ -2535,12 +2051,12 @@ export component AppWindow inherits Window {
                 HorizontalLayout {
                     spacing: 16px;
                     Text {
-                        text: "Label:";
+                        text: "Input Ports:";
                         vertical-alignment: center;
                         font-size: 13px;
                         font-weight: 500;
                         color: #555555;
-                        width: 50px;
+                        width: 80px;
                     }
 
                     Rectangle {
@@ -2551,16 +2067,17 @@ export component AppWindow inherits Window {
                         height: 32px;
 
                         TextInput {
-                            text: root.edit_label;
+                            text: root.temp_ip_ports;
+
                             font-size: 13px;
                             vertical-alignment: center;
                             single-line: true;
 
-                            x: 8px;
-                            width: parent.width - 16px;
+                            x: 16px;
+                            width: parent.width - 32px;
 
                             edited => {
-                                root.edit_label = self.text;
+                                root.temp_ip_ports = self.text.to-float();
                             }
                         }
                     }
@@ -2569,12 +2086,12 @@ export component AppWindow inherits Window {
                 HorizontalLayout {
                     spacing: 16px;
                     Text {
-                        text: "Value:";
+                        text: "Output Ports:";
                         vertical-alignment: center;
                         font-size: 13px;
                         font-weight: 500;
                         color: #555555;
-                        width: 50px;
+                        width: 80px;
                     }
 
                     Rectangle {
@@ -2585,15 +2102,15 @@ export component AppWindow inherits Window {
                         height: 32px;
 
                         TextInput {
-                            text: root.edit_value;
+                            text: root.temp_op_ports;
                             font-size: 13px;
                             vertical-alignment: center;
                             single-line: true;
-                            x: 8px;
-                            width: parent.width - 16px;
+                            x: 16px;
+                            width: parent.width - 32px;
 
                             edited => {
-                                root.edit_value = self.text;
+                                root.temp_op_ports = self.text.to-float();
                             }
                         }
                     }
@@ -2611,7 +2128,7 @@ export component AppWindow inherits Window {
                         height: 32px;
                         primary: true;
                         clicked => {
-                            root.show_node_modal = false;
+                            root.show_port_configuration_modal = false;
                         }
                     }
 
@@ -2621,8 +2138,10 @@ export component AppWindow inherits Window {
                         height: 32px;
                         primary: true;
                         clicked => {
-                            root.save_node_properties(root.editing_index, root.edit_label, root.edit_value);
-                            root.show_node_modal = false;
+                            root.function_node_ip_ports = root.temp_ip_ports.to-float();
+                            root.function_node_op_ports = root.temp_op_ports.to-float();
+
+                            root.show_port_configuration_modal = false;
                         }
                     }
                 }

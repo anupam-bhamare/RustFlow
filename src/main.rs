@@ -1,10 +1,11 @@
-use slint::{ComponentHandle, Model, ModelRc, ToSharedString, VecModel};
+use slint::{ComponentHandle, Model, ModelRc, ToSharedString, VecModel, SharedString};
 use std::cell::{Cell, RefCell};
 use std::fs::File;
-use std::io::Read;
 use std::io::Write;
 use std::rc::Rc;
-
+mod graph_engine;
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::prelude::*;
 slint::include_modules!();
 
 #[derive(Clone, Debug)]
@@ -17,6 +18,9 @@ struct SymbolClipboardData {
     node_type: String,
     bg_color: String,
     creation_mode: i32,
+    ip_ports: i32,
+    op_ports: i32
+   
 }
 
 #[derive(Clone, Debug)]
@@ -26,6 +30,10 @@ struct WireClipboardData {
     creation_mode: i32,
     from_port: String,
     to_port: String,
+    from_port_offset_x: f32,
+    from_port_offset_y: f32,
+    to_port_offset_x: f32,
+    to_port_offset_y: f32,
 }
 
 #[derive(Clone, Debug)]
@@ -36,7 +44,7 @@ struct SubgraphClipboard {
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 pub struct JsonNode {
-    pub id: String,
+    pub id: i32,
     pub label: String,
     #[serde(rename = "node_type")]
     pub node_type: String,
@@ -45,6 +53,15 @@ pub struct JsonNode {
     pub value: String,
     pub bg_color: String,
     pub creation_mode: i32,
+    pub ip_ports: i32,
+    pub op_ports: i32,
+    pub ip_names: Vec<String>,
+    pub ip_values: Vec<String>,
+    pub op_names: Vec<String>,
+    pub op_values: Vec<String>,
+    pub ip_types: Vec<String>,
+    pub op_types: Vec<String>,
+    
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
@@ -54,6 +71,10 @@ pub struct JsonWire {
     pub layout_mode: i32,
     pub from_port: String,
     pub to_port: String,
+    pub from_port_offset_x: f32,
+    pub from_port_offset_y: f32,
+    pub to_port_offset_x: f32,
+    pub to_port_offset_y: f32,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
@@ -68,7 +89,14 @@ pub struct CanvasStateSnapshot {
     pub connections: Vec<Connection>,
 }
 
-fn main() -> Result<(), slint::PlatformError> {
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen(main))]
+pub fn main() -> Result<(), slint::PlatformError> {
+    #[cfg(target_arch = "wasm32")]
+    {
+        // Uncomment this! It will print the ACTUAL Rust panic message
+        // to your browser console instead of just saying "unreachable"
+        std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+    }
     let ui = AppWindow::new()?;
     let weak_app = ui.as_weak();
     let symbols_model = Rc::new(VecModel::<SymbolEntry>::default());
@@ -85,7 +113,105 @@ fn main() -> Result<(), slint::PlatformError> {
         }
     })
     .unwrap();
+fn model_to_vec<T: Clone + 'static>(model: &slint::ModelRc<T>) -> Vec<T> {
+    let mut vec = Vec::new();
+    for i in 0..model.row_count() {
+        if let Some(item) = model.row_data(i) {
+            vec.push(item);
+        }
+    }
+    vec
+}
 
+
+ui.on_add_ip_port({
+    let ui_handle = ui.as_weak();
+    move || {
+        if let Some(ui) = ui_handle.upgrade() {
+            
+            let mut names = model_to_vec(&ui.get_ip_names());
+            names.push("".into());
+            ui.set_ip_names(std::rc::Rc::new(slint::VecModel::from(names)).into());
+            
+            let mut values = model_to_vec(&ui.get_ip_values());
+            values.push("".into());
+            ui.set_ip_values(std::rc::Rc::new(slint::VecModel::from(values)).into());
+
+            let mut types = model_to_vec(&ui.get_ip_types());
+            types.push("Number".into()); // Default type
+            ui.set_ip_types(std::rc::Rc::new(slint::VecModel::from(types)).into());
+        }
+    }
+});
+
+ui.on_add_op_port({
+    let ui_handle = ui.as_weak();
+    move || {
+        if let Some(ui) = ui_handle.upgrade() {
+            // Convert using the helper
+            let mut names = model_to_vec(&ui.get_op_names());
+            names.push("".into());
+            ui.set_op_names(std::rc::Rc::new(slint::VecModel::from(names)).into());
+            
+            let mut values = model_to_vec(&ui.get_op_values());
+            values.push("".into());
+            ui.set_op_values(std::rc::Rc::new(slint::VecModel::from(values)).into());
+
+            let mut types = model_to_vec(&ui.get_op_types());
+            types.push("Number".into()); // Default type
+            ui.set_op_types(std::rc::Rc::new(slint::VecModel::from(types)).into());
+        }
+    }
+}); 
+ui.on_request_edit_node({
+    let symbols = symbols_model.clone();
+    let ui_handle = ui.as_weak();
+    
+    move |index| {
+        if let Some(ui) = ui_handle.upgrade() {
+            if let Some(node) = symbols.row_data(index as usize) {
+                  let valid_ip_names: Vec<String> = node.ip_names.iter()
+                    .map(|s| s.to_string())
+                    .filter(|s| !s.trim().is_empty())
+                    .collect();
+                
+                let valid_op_names: Vec<String> = node.op_names.iter()
+                    .map(|s| s.to_string())
+                    .filter(|s| !s.trim().is_empty())
+                    .collect();
+
+              
+                let ip_port_count = valid_ip_names.len() as i32;
+                let op_port_count = valid_op_names.len() as i32;
+
+               
+                ui.set_ip_port_count(ip_port_count);
+                ui.set_op_port_count(op_port_count);
+                ui.set_ip_names(node.ip_names.clone());
+                ui.set_ip_values(node.ip_values.clone());
+                ui.set_ip_types(node.ip_types.clone());
+                ui.set_op_names(node.op_names.clone());
+                ui.set_op_values(node.op_values.clone());
+                ui.set_op_types(node.op_types.clone());
+                
+                ui.set_edit_label(node.label.clone());
+                ui.set_editing_index(index as i32);
+                ui.set_show_node_modal(true);
+            }
+        }
+    }
+});
+let symbols_model_for_closure = symbols_model.clone();
+let connections_model = connections.clone();
+
+ui.on_deploy_flow_clicked(move || {
+       let connections_vec: Vec<Connection> = (0..connections_model.row_count())
+        .filter_map(|i| connections_model.row_data(i))
+        .collect();
+       graph_engine::execute_deploy_flow(symbols_model_for_closure.clone(), connections_vec);
+
+     println!("Deployment flow executed successfully.");
+});
     ui.on_node_clicked(move |clicked_index, shift_pressed| {
         if let Some(ui_active) = ui_weak_select.upgrade() {
             let current_selection = ui_active.get_selected_indexes();
@@ -148,6 +274,9 @@ fn main() -> Result<(), slint::PlatformError> {
                         node_type: symbol.node_type.to_string(),
                         bg_color: symbol.bg_color.to_string(),
                         creation_mode: symbol.creation_mode,
+                        ip_ports: symbol.ip_ports,
+                        op_ports: symbol.op_ports,
+
                     },
                 ));
             }
@@ -165,6 +294,10 @@ fn main() -> Result<(), slint::PlatformError> {
                         creation_mode: wire.creation_mode,
                         from_port: wire.from_port.to_string(),
                         to_port: wire.to_port.to_string(),
+                        from_port_offset_x: wire.from_port_offset_x,
+                        from_port_offset_y: wire.from_port_offset_y,
+                        to_port_offset_x: wire.to_port_offset_x,
+                        to_port_offset_y: wire.to_port_offset_y,
                     });
                 }
             }
@@ -217,6 +350,9 @@ fn main() -> Result<(), slint::PlatformError> {
                         node_type: symbol.node_type.to_string(),
                         bg_color: symbol.bg_color.to_string(),
                         creation_mode: symbol.creation_mode,
+                        ip_ports: symbol.ip_ports,
+                        op_ports: symbol.op_ports,
+
                     },
                 ));
             }
@@ -251,6 +387,10 @@ fn main() -> Result<(), slint::PlatformError> {
                             creation_mode: wire.creation_mode,
                             from_port: wire.from_port.to_string(),
                             to_port: wire.to_port.to_string(),
+                            from_port_offset_x: wire.from_port_offset_x,
+                            from_port_offset_y: wire.from_port_offset_y,
+                            to_port_offset_x: wire.to_port_offset_x,
+                            to_port_offset_y: wire.to_port_offset_y,
                         });
                     }
                 }
@@ -290,16 +430,33 @@ fn main() -> Result<(), slint::PlatformError> {
     });
     let clipboard_paste = subgraph_clipboard.clone();
     let ui_weak_paste = ui.as_weak();
-
-    ui.on_paste_selected_subgraph(move |_, _| {
+    let symbols_drop_ref = symbols_model.clone();
+    let wires_drop_ref = connections.clone();
+   
+    ui.on_paste_selected_subgraph(move |drop_x, drop_y| {
         if let Some(ref clipboard) = *clipboard_paste.borrow() {
             if clipboard.nodes.is_empty() {
                 return;
             }
 
             if let Some(ui_active) = ui_weak_paste.upgrade() {
-                let mut temporary_ghosts = Vec::new();
-                let mut temporary_ghost_wires = Vec::new();
+                let base_symbols_count = symbols_drop_ref.row_count() as i32;
+
+                
+                let vec_nodes_model = match symbols_drop_ref
+                    .as_any()
+                    .downcast_ref::<slint::VecModel<SymbolEntry>>()
+                {
+                    Some(m) => m,
+                    None => return,
+                };
+                let vec_wires_model = match wires_drop_ref
+                    .as_any()
+                    .downcast_ref::<slint::VecModel<Connection>>()
+                {
+                    Some(m) => m,
+                    None => return,
+                };
 
                 let min_x = clipboard
                     .nodes
@@ -314,48 +471,56 @@ fn main() -> Result<(), slint::PlatformError> {
 
                 let mut local_index_map = std::collections::HashMap::new();
 
-                for (local_idx, (old_global_idx, node)) in clipboard.nodes.iter().enumerate() {
+                  for (local_idx, (old_global_idx, node)) in clipboard.nodes.iter().enumerate() {
                     local_index_map.insert(*old_global_idx as i32, local_idx as i32);
+                    let mut real_node = SymbolEntry::default();
+                   
+                    let unique_index = base_symbols_count + (local_idx as i32);
+                    real_node.name = format!("node_{}", unique_index).to_shared_string();
+                    real_node.label = node.label.to_shared_string();
+                    real_node.node_type = node.node_type.to_shared_string();
+                    real_node.bg_color = node.bg_color.to_shared_string();
+                    real_node.value = node.value.to_shared_string();
+                    real_node.creation_mode = node.creation_mode;
+                    real_node.is_selected = false;
+                    real_node.ip_ports = node.ip_ports;
+                    real_node.op_ports = node.op_ports;
+                    real_node.ip_names = slint::ModelRc::default();
+                    real_node.op_names = slint::ModelRc::default();
+                    real_node.ip_values = slint::ModelRc::default();
+                    real_node.op_values = slint::ModelRc::default();                   
+                    real_node.x = drop_x + (node.x - min_x);
+                    real_node.y = drop_y + (node.y - min_y);
 
-                    let mut ghost_node = SymbolEntry::default();
-                    ghost_node.label = node.label.to_shared_string();
-                    ghost_node.node_type = node.node_type.to_shared_string();
-                    ghost_node.bg_color = node.bg_color.to_shared_string();
-                    ghost_node.x = node.x - min_x;
-                    ghost_node.y = node.y - min_y;
-                    ghost_node.creation_mode = node.creation_mode;
-
-                    temporary_ghosts.push(ghost_node);
+                    vec_nodes_model.push(real_node);
                 }
 
+                
                 for wire in &clipboard.wires {
                     if let (Some(local_from), Some(local_to)) = (
                         local_index_map.get(&wire.from_index),
                         local_index_map.get(&wire.to_index),
                     ) {
-                        let mut ghost_wire = Connection::default();
-                        ghost_wire.from_index = *local_from;
-                        ghost_wire.to_index = *local_to;
-                        ghost_wire.from_port = wire.from_port.to_shared_string();
-                        ghost_wire.to_port = wire.to_port.to_shared_string();
-                        ghost_wire.creation_mode = wire.creation_mode;
-
-                        temporary_ghost_wires.push(ghost_wire);
+                        let mut real_wire = Connection::default();
+                        real_wire.from_index = base_symbols_count + *local_from;
+                        real_wire.to_index = base_symbols_count + *local_to;
+                        real_wire.from_port = wire.from_port.to_shared_string();
+                        real_wire.to_port = wire.to_port.to_shared_string();
+                        real_wire.creation_mode = wire.creation_mode;
+                        real_wire.selected = false;
+                        real_wire.from_port_offset_x = wire.from_port_offset_x;
+                        real_wire.from_port_offset_y = wire.from_port_offset_y;
+                        real_wire.to_port_offset_x = wire.to_port_offset_x;
+                        real_wire.to_port_offset_y = wire.to_port_offset_y;
+                        vec_wires_model.push(real_wire);
                     }
                 }
 
-                ui_active.set_ghost_symbols(slint::ModelRc::new(slint::VecModel::from(
-                    temporary_ghosts,
-                )));
-                ui_active.set_ghost_connections(slint::ModelRc::new(slint::VecModel::from(
-                    temporary_ghost_wires,
-                )));
-
-                ui_active.set_is_pasting_mode(true);
+                
+                ui_active.window().request_redraw();
             }
         }
     });
-
     let ui_weak = ui.as_weak();
     ui.on_select_all(move || {
         if let Some(ui_active) = ui_weak.upgrade() {
@@ -403,18 +568,18 @@ fn main() -> Result<(), slint::PlatformError> {
             None => return,
         };
 
-        if !ui.get_is_pasting_mode() {
-            return;
-        }
-
         let ghost_symbols = ui.get_ghost_symbols();
         let ghost_connections = ui.get_ghost_connections();
 
+        if ghost_symbols.row_count() == 0 {
+            return;
+        }
+
         let drop_x = ui.get_live_mouse_x();
         let drop_y = ui.get_live_mouse_y();
-
         let base_symbols_count = symbols_drop_ref.row_count() as i32;
 
+    
         if let Some(vec_nodes_model) = symbols_drop_ref
             .as_any()
             .downcast_ref::<slint::VecModel<SymbolEntry>>()
@@ -422,26 +587,27 @@ fn main() -> Result<(), slint::PlatformError> {
             for i in 0..ghost_symbols.row_count() {
                 if let Some(ghost) = ghost_symbols.row_data(i) {
                     let mut real_node = SymbolEntry::default();
-                    let nanos = std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap_or_default()
-                        .as_nanos();
 
-                    real_node.name = format!("node_{}_{}", i, nanos).to_shared_string();
+                    real_node.name = format!("node_{}", i).to_shared_string();
                     real_node.label = ghost.label;
+                    real_node.value = ghost.value;
                     real_node.node_type = ghost.node_type;
                     real_node.bg_color = ghost.bg_color;
                     real_node.x = drop_x + ghost.x;
                     real_node.y = drop_y + ghost.y;
-                    real_node.is_selected = true;
+                    real_node.is_selected = false; // Prevent selection loops on canvas refresh
                     real_node.creation_mode = ghost.creation_mode;
-
+                    real_node.ip_names = slint::ModelRc::default();
+                    real_node.ip_values= slint::ModelRc::default();
+                    real_node.op_names= slint::ModelRc::default();
+                    real_node.op_values= slint::ModelRc::default();
                     vec_nodes_model.push(real_node);
                 }
             }
         }
 
-        if let Some(vec_wires_model) = wires_drop_ref
+             
+             if let Some(vec_wires_model) = wires_drop_ref
             .as_any()
             .downcast_ref::<slint::VecModel<Connection>>()
         {
@@ -451,7 +617,6 @@ fn main() -> Result<(), slint::PlatformError> {
 
                     real_wire.from_index = base_symbols_count + ghost_wire.from_index;
                     real_wire.to_index = base_symbols_count + ghost_wire.to_index;
-
                     real_wire.from_port = ghost_wire.from_port;
                     real_wire.to_port = ghost_wire.to_port;
                     real_wire.creation_mode = ghost_wire.creation_mode;
@@ -461,9 +626,11 @@ fn main() -> Result<(), slint::PlatformError> {
                 }
             }
         }
-
+         
         ui.set_ghost_symbols(slint::ModelRc::new(slint::VecModel::default()));
         ui.set_ghost_connections(slint::ModelRc::new(slint::VecModel::default()));
+
+              ui.set_is_pasting_mode(false);
     });
     let history_stack = Rc::new(RefCell::new(Vec::<CanvasStateSnapshot>::new()));
     let redo_stack = Rc::new(RefCell::new(Vec::<CanvasStateSnapshot>::new())); // Your initialization
@@ -482,8 +649,7 @@ fn main() -> Result<(), slint::PlatformError> {
                 symbols: current_symbols,
                 connections: current_conns,
             });
-
-            r_stack.borrow_mut().clear(); // <--- Uses the cloned pointer safely!
+            r_stack.borrow_mut().clear(); 
         })
     };
 
@@ -495,20 +661,32 @@ fn main() -> Result<(), slint::PlatformError> {
     let place_model = symbols_model.clone();
     let save_h = save_history.clone();
 
-    ui.on_place_symbol(move |name, node_type, bg_color, x, y, mode| {
-        save_h(); // Log history block state before structural push
-        place_model.push(SymbolEntry {
-            name: name.clone(),
-            label: name.clone(),
-            node_type,
-            bg_color,
-            x,
-            y,
-            value: "".into(),
-            creation_mode: mode,
-            is_selected: false,
-        });
-    });
+    ui.on_place_symbol(
+        move |name, node_type, bg_color, x, y, mode, ip_ports, op_ports| {
+            save_h(); // Log history block state before structural push
+            let new_id = place_model.row_count() as i32;
+            place_model.push(SymbolEntry {
+                id: new_id,
+                name: name.clone(),
+                label: name.clone(),
+                node_type,
+                bg_color,
+                x,
+                y,
+                value: "".into(),
+                creation_mode: mode,
+                is_selected: false,
+                ip_ports,
+                op_ports,
+                ip_names: slint::ModelRc::default(),
+                ip_values: slint::ModelRc::default(),
+                op_names: slint::ModelRc::default(),
+                op_values: slint::ModelRc::default(),
+                ip_types: slint::ModelRc::default(),
+                op_types: slint::ModelRc::default(),
+            });
+        },
+    );
 
     let move_model = symbols_model.clone();
     let save_h = save_history.clone();
@@ -522,66 +700,101 @@ fn main() -> Result<(), slint::PlatformError> {
         }
     });
 
-    let wire_source = Rc::new(Cell::new(-1));
-    let active_source_port = Rc::new(RefCell::new(String::new()));
+let wire_source = Rc::new(Cell::new(-1));
+let active_source_port = Rc::new(std::cell::RefCell::new(String::new()));
+let active_source_is_input = Rc::new(Cell::new(false));
 
-    ui.on_handle_port_click({
-        let conn_model = connections.clone();
-        let wire_source = wire_source.clone();
-        let src_port = active_source_port.clone();
-        let save_h = save_history.clone();
+ui.on_handle_port_click({
+    let conn_model = connections.clone();
+    let wire_source = wire_source.clone();
+    let src_port = active_source_port.clone();
+    let src_is_input = active_source_is_input.clone(); 
+    let save_h = save_history.clone();
+    let model = symbols_model.clone();
+    move |node_index, is_input, mode, port_name| {
+        let port_str = port_name.to_string();
+        let source = wire_source.get();
 
-        move |node_index, _is_input, mode, port_name| {
-            let port_str = port_name.to_string();
-            let source = wire_source.get();
+        if source == -1 {
+                
+            wire_source.set(node_index);
+            *src_port.borrow_mut() = port_str;
+            src_is_input.set(is_input); 
+            println!("Drag STARTED from Node {}, Port {} (Is Input: {})", node_index, port_name, is_input);
+        } else {
+         
+            let first_is_input = src_is_input.get();
+            
+        
+            if source != node_index && first_is_input != is_input {
+                let first_port = src_port.borrow().clone();
+                let second_port = port_str.clone();
 
-            if source == -1 {
-                wire_source.set(node_index);
-                *src_port.borrow_mut() = port_str;
-                println!("Drag STARTED from Node {}, Port {}", node_index, port_name);
-            } else {
-                if source != node_index {
-                    let first_port = src_port.borrow().clone();
-                    let second_port = port_str.clone();
+             
+               let (final_from_index, final_to_index, final_from_port, final_to_port) = if first_is_input {                    
+                    (node_index, source, second_port.clone(), first_port.clone())
+                } else {                   
+                    (source, node_index, first_port.clone(), second_port.clone())
+                };
 
-                    let mut final_from_index = source;
-                    let mut final_to_index = node_index;
-                    let mut from_port_shared = slint::SharedString::from(first_port.clone());
-                    let mut to_port_shared = slint::SharedString::from(second_port.clone());
+                let from_node = model.row_data(final_from_index as usize).unwrap();
+                let to_node = model.row_data(final_to_index as usize).unwrap();
 
-                    if first_port == "left" {
-                        final_from_index = node_index;
-                        final_to_index = source;
-                        from_port_shared = slint::SharedString::from(second_port.clone());
-                        to_port_shared = slint::SharedString::from(first_port.clone());
-                    }
+                let from_ip_count = from_node.ip_ports as usize;
+                let to_ip_count = to_node.ip_ports as usize;
+                let (from_off_x, from_off_y) =
+                calculate_port_offsets(&final_from_port, from_ip_count);
 
-                    save_h(); // Log the system layout topology before pushing connection wire
-
-                    conn_model.push(Connection {
-                        from_index: final_from_index,
-                        to_index: final_to_index,
-                        selected: false,
-                        creation_mode: mode,
-                        from_port: from_port_shared.clone(),
-                        to_port: to_port_shared.clone(),
-                    });
-
-                    println!(
-                        "Line drawn from Node {}/{} to Node {}/{}",
-                        final_from_index, from_port_shared, final_to_index, to_port_shared
-                    );
-                }
-
-                wire_source.set(-1);
-                *src_port.borrow_mut() = String::new();
-            }
+                let (to_off_x, to_off_y) =
+                calculate_port_offsets(&final_to_port, to_ip_count);
+                let from_port_shared = slint::SharedString::from(final_from_port);
+                let to_port_shared = slint::SharedString::from(final_to_port);
+                save_h(); 
+                println!(
+                    "Line drawn from Node {}/{} to Node {}/{}",
+                    final_from_index, from_port_shared, final_to_index, to_port_shared
+                );
+                conn_model.push(Connection {
+                    from_index: final_from_index,
+                    to_index: final_to_index,
+                    selected: false,
+                    creation_mode: mode,
+                    from_port: from_port_shared,
+                    to_port: to_port_shared,
+                    from_port_offset_x: from_off_x,
+                    from_port_offset_y: from_off_y,
+                    to_port_offset_x: to_off_x,
+                    to_port_offset_y: to_off_y,
+                });
+            } else if first_is_input == is_input && source != node_index {
+                println!("Connection rejected: Cannot connect two identical port types (IP->IP or OP->OP).");
+            }                   
+                   
+            wire_source.set(-1);
+            *src_port.borrow_mut() = String::new();
+            src_is_input.set(false);
         }
-    });
-    ui.on_select_connection({
+    }
+});
+
+fn calculate_port_offsets(port_name: &str, ip_ports_total: usize) -> (f32, f32) {
+    let parts: Vec<&str> = port_name.split('_').collect();
+    let side = parts[0];
+    let port_index: usize = parts[1].parse().unwrap_or(0);
+    
+    let header_height = 40.0;
+    let row_height = 35.0;
+
+    match side {
+        "left" => (0.0, header_height + (port_index as f32 * row_height) + (row_height / 2.0)),
+        "right" => (140.0, header_height + (ip_ports_total as f32 * row_height) + (port_index as f32 * row_height) + (row_height / 2.0)),
+        _ => (0.0, 0.0)
+    }
+}
+ui.on_select_connection({
         let connections = connections.clone();
         move |index| {
-            if index < 0 {           
+            if index < 0 {
                 for i in 0..connections.row_count() {
                     if let Some(mut conn) = connections.row_data(i) {
                         conn.selected = false;
@@ -590,7 +803,8 @@ fn main() -> Result<(), slint::PlatformError> {
                 }
                 println!("All connections deselected.");
                 return;
-            }        
+            }
+
             for i in 0..connections.row_count() {
                 if let Some(mut conn) = connections.row_data(i) {
                     conn.selected = i == index as usize;
@@ -620,20 +834,90 @@ fn main() -> Result<(), slint::PlatformError> {
             }
         }
     });
+ui.on_save_node_properties({
+    let model = symbols_model.clone();
+    let save_h = save_history.clone();
+    let ui_handle = ui.as_weak();
+    let conn_model = connections.clone();
 
-    ui.on_save_node_properties({
-        let model = symbols_model.clone();
-        let save_h = save_history.clone();
-        move |index, label, value| {
-            if let Some(mut node) = model.row_data(index as usize) {
-                save_h(); // Snapshot property states before text alteration updates
-                node.label = label;
-                node.value = value;
-                model.set_row_data(index as usize, node);
+    move |index, _ip_count, _op_count, label, ip_names, ip_values, op_names, op_values, ip_types, op_types| {
+        if let Some(ui) = ui_handle.upgrade() {
+
+         
+
+ for i in 0..ip_types.row_count() {
+            let ty = ip_types.row_data(i).unwrap_or_default();
+            let value = ip_values.row_data(i).unwrap_or_default();
+
+            if ty.as_str() == "Number" && value.parse::<f64>().is_err() {
+             
+                ui.invoke_trigger_alert(
+                    format!("Invalid input value at port {}", i).into()
+                );
+                return false;
             }
         }
-    });
 
+      
+        for i in 0..op_types.row_count() {
+            let ty = op_types.row_data(i).unwrap_or_default();
+            let value = op_values.row_data(i).unwrap_or_default();
+
+            if ty.as_str() == "Number" && value.parse::<f64>().is_err() {
+                ui.invoke_trigger_alert(
+                   
+                    format!("Invalid output value at port {}", i).into()
+                );
+                return false;
+            }
+        }
+
+   
+            
+            if let Some(mut node) = model.row_data(index as usize) {
+                save_h();
+
+                let ip_n: Vec<slint::SharedString> = (0..ip_names.row_count())
+                    .map(|i| ip_names.row_data(i).unwrap_or_default())
+                    .filter(|s| !s.trim().is_empty())
+                    .collect();
+
+                let op_n: Vec<slint::SharedString> = (0..op_names.row_count())
+                    .map(|i| op_names.row_data(i).unwrap_or_default())
+                    .filter(|s| !s.trim().is_empty())
+                    .collect();
+
+                node.label = label;
+                node.ip_ports = ip_n.len() as i32;
+                node.op_ports = op_n.len() as i32;
+
+                node.ip_names = std::rc::Rc::new(slint::VecModel::from(ip_n)).into();
+                node.op_names = std::rc::Rc::new(slint::VecModel::from(op_n)).into();
+
+                node.ip_values = ip_values;
+                node.op_values = op_values;
+                node.ip_types = ip_types;
+                node.op_types = op_types;
+    for i in 0..conn_model.row_count() {
+    let mut conn = conn_model.row_data(i).unwrap();
+    
+    if conn.from_index == index {
+        let (x, y) = calculate_port_offsets(&conn.from_port, node.ip_ports as usize);
+        conn.from_port_offset_y = y;
+        conn_model.set_row_data(i, conn);
+    }
+}
+                model.set_row_data(index as usize, node);
+            
+                ui.set_editing_index(-1);
+                return  true;
+             
+             
+            }
+        }
+        return  false;
+    }
+});  
     let ui_save_weak = ui.as_weak();
     let export_symbols_active = symbols_model.clone();
     let export_connections_active = connections.clone();
@@ -649,10 +933,9 @@ fn main() -> Result<(), slint::PlatformError> {
 
         for i in 0..export_symbols_active.row_count() {
             if let Some(item) = export_symbols_active.row_data(i) {
-                let explicit_id = (i + 1).to_string();
-
+         
                 json_nodes.push(JsonNode {
-                    id: explicit_id,
+                    id: item.id,
                     label: if item.label.is_empty() {
                         item.name.to_string()
                     } else {
@@ -668,6 +951,33 @@ fn main() -> Result<(), slint::PlatformError> {
                         item.bg_color.to_string()
                     },
                     creation_mode: item.creation_mode,
+                    ip_ports: item.ip_ports,
+                    op_ports: item.op_ports,
+                    
+                    ip_names: item.ip_names
+    .iter()
+    .map(|s| s.to_string()) 
+    .collect(),
+    ip_values: item.ip_values
+    .iter()
+    .map(|s| s.to_string()) 
+    .collect(),
+    op_names: item.op_names
+    .iter()
+    .map(|s| s.to_string()) 
+    .collect(),
+    op_values:item.op_values
+    .iter()
+    .map(|s| s.to_string()) 
+    .collect(),
+    ip_types:item.ip_types
+    .iter()
+    .map(|s| s.to_string()) 
+    .collect(),
+     op_types:item.op_types
+    .iter()
+    .map(|s| s.to_string()) 
+    .collect(),
                 });
             }
         }
@@ -676,11 +986,16 @@ fn main() -> Result<(), slint::PlatformError> {
         for i in 0..export_connections_active.row_count() {
             if let Some(conn) = export_connections_active.row_data(i) {
                 json_wires.push(JsonWire {
-                    from: format!("node_{}", conn.from_index + 1),
-                    to: format!("node_{}", conn.to_index + 1),
+                    from: format!("node_{}", conn.from_index ),
+                    to: format!("node_{}", conn.to_index ),
                     layout_mode: conn.creation_mode,
                     from_port: conn.from_port.to_string(),
                     to_port: conn.to_port.to_string(),
+                    from_port_offset_x: conn.from_port_offset_x,
+                    from_port_offset_y: conn.from_port_offset_y,
+                    to_port_offset_x: conn.to_port_offset_x,
+                    to_port_offset_y: conn.to_port_offset_y,
+                    
                 });
             }
         }
@@ -692,24 +1007,73 @@ fn main() -> Result<(), slint::PlatformError> {
 
         let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S").to_string();
         let filename = format!("flow_layout_{}.json", timestamp);
-
         if let Ok(json_string) = serde_json::to_string_pretty(&export_data) {
-            match File::create(&filename) {
-                Ok(mut file) => {
-                    let _ = file.write_all(json_string.as_bytes());
-                    if let Some(ui_active) = ui_save_weak.upgrade() {
-                        let message = slint::SharedString::from(format!(
-                            "Flow configuration successfully saved to:\n{}",
-                            filename
-                        ));
-                        ui_active.invoke_trigger_alert(message);
+            // --- WASM (Web Browser) Target ---
+            #[cfg(target_arch = "wasm32")]
+            {
+                if let Some(window) = web_sys::window() {
+                    if let Some(document) = window.document() {
+                        if let Ok(Some(element)) = document
+                            .create_element("a")
+                            .map(|e| e.dyn_into::<web_sys::HtmlAnchorElement>().ok())
+                        {
+                            // 1. Create a JS array containing our JSON string
+                            let parts =
+                                js_sys::Array::of1(&wasm_bindgen::JsValue::from_str(&json_string));
+
+                            // 2. Specify the MIME type as application/json
+                            let mut options = web_sys::BlobPropertyBag::new();
+                            options.type_("application/json");
+
+                            // 3. Create a Blob and generate a temporary download URL
+                            if let Ok(blob) =
+                                web_sys::Blob::new_with_str_sequence_and_options(&parts, &options)
+                            {
+                                if let Ok(url) = web_sys::Url::create_object_url_with_blob(&blob) {
+                                    let _ = element.set_attribute("href", &url);
+                                    let _ = element.set_attribute("download", &filename);
+
+                                    // 4. Trigger the download dialogue
+                                    element.click();
+
+                                    // 5. Clean up the URL resource from browser memory
+                                    let _ = web_sys::Url::revoke_object_url(&url);
+
+                                    if let Some(ui_active) = ui_save_weak.upgrade() {
+                                        let message = slint::SharedString::from(format!(
+                                            "Flow configuration prepared for download:\n{}",
+                                            filename
+                                        ));
+                                        ui_active.invoke_trigger_alert(message);
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
-                Err(e) => {
-                    if let Some(ui_active) = ui_save_weak.upgrade() {
-                        let message =
-                            slint::SharedString::from(format!("Failed to create file:\n{:?}", e));
-                        ui_active.invoke_trigger_alert(message);
+            }
+
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                match File::create(&filename) {
+                    Ok(mut file) => {
+                        let _ = file.write_all(json_string.as_bytes());
+                        if let Some(ui_active) = ui_save_weak.upgrade() {
+                            let message = slint::SharedString::from(format!(
+                                "Flow configuration successfully saved to:\n{}",
+                                filename
+                            ));
+                            ui_active.invoke_trigger_alert(message);
+                        }
+                    }
+                    Err(e) => {
+                        if let Some(ui_active) = ui_save_weak.upgrade() {
+                            let message = slint::SharedString::from(format!(
+                                "Failed to create file:\n{:?}",
+                                e
+                            ));
+                            ui_active.invoke_trigger_alert(message);
+                        }
                     }
                 }
             }
@@ -720,93 +1084,118 @@ fn main() -> Result<(), slint::PlatformError> {
     let import_connections = connections.clone();
     let ui_load_weak = ui.as_weak();
     let save_h = save_history.clone();
-
+  
     ui.on_load_flow(move || {
-        let file_picker = rfd::FileDialog::new()
-            .add_filter("JSON Flow Profiles", &["json"])
-            .set_title("Select Flow Configuration Layout")
-            .pick_file();
+        let import_symbols = import_symbols.clone();
+        let import_connections = import_connections.clone();
+        let ui_load_weak = ui_load_weak.clone();
+        let save_h = save_h.clone();
 
-        let path = match file_picker {
-            Some(p) => p,
-            None => return,
-        };
+        let fut = async move {
+            let file_picker = rfd::AsyncFileDialog::new()
+                .add_filter("JSON Flow Profiles", &["json"])
+                .set_title("Select Flow Configuration Layout")
+                .pick_file()
+                .await; //  This is now legal because it's inside the `async move` block!
 
-        let file_data = match File::open(&path) {
-            Ok(mut file) => {
-                let mut contents = String::new();
-                if file.read_to_string(&mut contents).is_ok() {
-                    contents
-                } else {
+            let file_handle = match file_picker {
+                Some(handle) => handle,
+                None => return,
+            };
+
+            let file_bytes = file_handle.read().await;
+            let file_data = match String::from_utf8(file_bytes) {
+                Ok(s) => s,
+                Err(_) => return,
+            };
+
+            let decoded_flow: FlowExport = match serde_json::from_str(&file_data) {
+                Ok(flow) => flow,
+                Err(e) => {
+                    if let Some(ui_active) = ui_load_weak.upgrade() {
+                        let msg = slint::SharedString::from(format!(
+                            "Failed to parse layout configuration file:\n{:?}",
+                            e
+                        ));
+                        ui_active.invoke_trigger_alert(msg);
+                    }
                     return;
                 }
-            }
-            Err(_) => return,
-        };
+            };
 
-        let decoded_flow: FlowExport = match serde_json::from_str(&file_data) {
-            Ok(flow) => flow,
-            Err(e) => {
-                if let Some(ui_active) = ui_load_weak.upgrade() {
-                    let msg = slint::SharedString::from(format!(
-                        "Failed to parse layout configuration file:\n{:?}",
-                        e
-                    ));
-                    ui_active.invoke_trigger_alert(msg);
-                }
-                return;
-            }
-        };
+            save_h();
+            let mut fresh_symbols = Vec::new();
+            let mut fresh_connections = Vec::new();
 
-        save_h();
-        let mut fresh_symbols = Vec::new();
-        let mut fresh_connections = Vec::new();
+            for node in decoded_flow.nodes {
+                fresh_symbols.push(SymbolEntry {
+                    id: node.id,
+                    name: node.label.clone().into(),
+                    label: node.label.into(),
+                    node_type: node.node_type.into(),
+                    x: node.x_pos,
+                    y: node.y_pos,
+                    value: node.value.into(),
+                    bg_color: node.bg_color.into(),
+                    creation_mode: node.creation_mode,
+                    is_selected: false,
+                    ip_ports: node.ip_ports,
+                    op_ports: node.op_ports,
 
-        for node in decoded_flow.nodes {
-            fresh_symbols.push(SymbolEntry {
-                name: node.label.clone().into(),
-                label: node.label.into(),
-                node_type: node.node_type.into(),
-                x: node.x_pos,
-                y: node.y_pos,
-                value: node.value.into(),
-                bg_color: node.bg_color.into(),
-                creation_mode: node.creation_mode,
-                is_selected: false,
-            });
-        }
-
-        for wire in decoded_flow.wires {
-            let from_id_str = wire.from.replace("node_", "");
-            let to_id_str = wire.to.replace("node_", "");
-
-            if let (Ok(from_val), Ok(to_val)) =
-                (from_id_str.parse::<i32>(), to_id_str.parse::<i32>())
-            {
-                fresh_connections.push(Connection {
-                    from_index: from_val - 1,
-                    to_index: to_val - 1,
-                    selected: false,
-                    creation_mode: wire.layout_mode,
-                    from_port: slint::SharedString::from(&wire.from_port),
-                    to_port: slint::SharedString::from(&wire.to_port),
+                    ip_names: ModelRc::new(VecModel::from(node.ip_names.into_iter().map(SharedString::from).collect::<Vec<SharedString>>(),)),
+                    ip_values: ModelRc::new(VecModel::from(node.ip_values.into_iter().map(SharedString::from).collect::<Vec<SharedString>>(),)),
+                    op_names: ModelRc::new(VecModel::from(node.op_names.into_iter().map(SharedString::from).collect::<Vec<SharedString>>(),)),
+                    op_values: ModelRc::new(VecModel::from(node.op_values.into_iter().map(SharedString::from).collect::<Vec<SharedString>>(),)),
+                    ip_types: ModelRc::new(VecModel::from(node.ip_types.into_iter().map(SharedString::from).collect::<Vec<SharedString>>(),)),
+                    op_types: ModelRc::new(VecModel::from(node.op_types.into_iter().map(SharedString::from).collect::<Vec<SharedString>>(),)),
+                
                 });
             }
+
+            for wire in decoded_flow.wires {
+                let from_id_str = wire.from.replace("node_", "");
+                let to_id_str = wire.to.replace("node_", "");
+
+                if let (Ok(from_val), Ok(to_val)) =
+                    (from_id_str.parse::<i32>(), to_id_str.parse::<i32>())
+                {
+                    fresh_connections.push(Connection {
+                        from_index: from_val,
+                        to_index: to_val,
+                        selected: false,
+                        creation_mode: wire.layout_mode,
+                        from_port: slint::SharedString::from(&wire.from_port),
+                        to_port: slint::SharedString::from(&wire.to_port),
+                        from_port_offset_x: wire.from_port_offset_x,
+                        from_port_offset_y: wire.from_port_offset_y,
+                        to_port_offset_x: wire.to_port_offset_x,
+                        to_port_offset_y: wire.to_port_offset_y                        
+                    });
+                }
+            }
+
+            import_symbols.set_vec(fresh_symbols);
+            import_connections.set_vec(fresh_connections);
+
+            if let Some(ui_active) = ui_load_weak.upgrade() {
+                let filename = file_handle.file_name();
+                let message = slint::SharedString::from(format!(
+                    "Flow composition parsed successfully!\nLoaded File: {}",
+                    filename
+                ));
+                ui_active.invoke_trigger_alert(message);
+            }
+        }; 
+        
+        #[cfg(target_arch = "wasm32")]
+        {
+            wasm_bindgen_futures::spawn_local(fut); // Runs asynchronously on the browser event thread
         }
-
-        import_symbols.set_vec(fresh_symbols);
-        import_connections.set_vec(fresh_connections);
-
-        if let Some(ui_active) = ui_load_weak.upgrade() {
-            let filename = path.file_name().unwrap_or_default().to_string_lossy();
-            let message = slint::SharedString::from(format!(
-                "Flow composition parsed successfully!\nLoaded File: {}",
-                filename
-            ));
-            ui_active.invoke_trigger_alert(message);
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            slint::spawn_local(fut).unwrap();
         }
     });
-
     let delete_model = symbols_model.clone();
     let ui_weak = ui.as_weak();
     let save_h = save_history.clone();
@@ -875,13 +1264,11 @@ fn main() -> Result<(), slint::PlatformError> {
                     return;
                 }
 
-                save_h(); // Log history context state data changes before removing indices
-
-                // 2. Process connections using your original logic pattern
+                save_h(); 
+              
                 for i in (0..connections.row_count()).rev() {
                     if let Some(mut conn) = connections.row_data(i) {
-                        // Check if this wire is attached to ANY of the deleted nodes
-                        let from_deleted = selected_indices.contains(&conn.from_index);
+                          let from_deleted = selected_indices.contains(&conn.from_index);
                         let to_deleted = selected_indices.contains(&conn.to_index);
 
                         if from_deleted || to_deleted {
@@ -890,7 +1277,7 @@ fn main() -> Result<(), slint::PlatformError> {
                         } else {
                             let mut changed = false;
 
-                            // Instead of -= 1, count how many deleted targets are BELOW this index
+                            // Instead of -= 1,
                             let shift_from = selected_indices
                                 .iter()
                                 .filter(|&&idx| conn.from_index > idx)
@@ -916,10 +1303,10 @@ fn main() -> Result<(), slint::PlatformError> {
                     }
                 }
 
-                // 3. Sort indices in descending order to safely remove them from the model
+                              
                 selected_indices.sort_by(|a, b| b.cmp(a));
 
-                // 4. Delete the symbols from the model
+              
                 for &index in &selected_indices {
                     let index_usize = index as usize;
                     if index_usize < delete_model.row_count() {
@@ -928,7 +1315,7 @@ fn main() -> Result<(), slint::PlatformError> {
                     }
                 }
 
-                // 5. Reset UI selection state
+            
                 let empty_model = std::rc::Rc::new(slint::VecModel::default()).into();
                 ui.set_selected_indexes(empty_model);
 
