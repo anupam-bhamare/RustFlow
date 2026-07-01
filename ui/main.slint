@@ -74,7 +74,7 @@ component NodeSymbol inherits Rectangle {
             horizontal-alignment: center;
         }
 
-        Text {
+         Text {
             text: root.value;
             font-italic: true;
             horizontal-alignment: center;
@@ -1220,12 +1220,21 @@ export component AppWindow inherits Window {
 
                             root.place_symbol(root.drag_name, root.drag_type, "#0d6efd", drop_x, drop_y, root.active_layout_mode, root.function_node_ip_ports, root.function_node_op_ports);
                             root.is_dragging = false;
+                            root.editing_index = root.all_symbols.length - 1;
+
+                            if (root.editing_index >= 0) {
+                                root.request_edit_node(root.editing_index);
+                                root.edit_label = root.all_symbols[root.editing_index].label;
+                                root.edit_value = root.all_symbols[root.editing_index].value;
+                                root.show_node_modal = true;
+                            }
                         } else if (root.selected_index != -1) {
                             root.selected_index = -1;
                         }
                     }
 
                     if (root.is_dragging): Rectangle {
+
                         property <bool> is_connector: root.drag_name == "A" || root.drag_name == "B";
                         property <bool> is_InputConnector: root.drag_type == "ip_connector";
                         property <bool> is_OutConnector: root.drag_type == "op_connector";
@@ -1818,52 +1827,52 @@ export component AppWindow inherits Window {
                 padding: 8px;
                 spacing: 6px;
 
-                 Rectangle {
-                            background: #dbe7f4;
-                            border-radius: 6px;
-                            border-width: 1px;
-                            border-color: #b0e6f8;
+                Rectangle {
+                    background: #dbe7f4;
+                    border-radius: 6px;
+                    border-width: 1px;
+                    border-color: #b0e6f8;
 
-                            VerticalLayout {
-                                padding: 8px;
-                                spacing: 6px;
+                    VerticalLayout {
+                        padding: 8px;
+                        spacing: 6px;
 
-                                HorizontalLayout {
-                                    Text {
-                                        text: "Node Details";
-                                        font-size: 12px;
-                                        font-weight: 600;
-                                    }
+                        HorizontalLayout {
+                            Text {
+                                text: "Node Details";
+                                font-size: 12px;
+                                font-weight: 600;
+                            }
+                        }
+
+                        HorizontalLayout {
+                            spacing: 4px;
+                            LineEdit {
+                                placeholder-text: "Node Name";
+                                text: root.edit_label;
+
+                                edited => {
+                                    root.edit_label = self.text;
                                 }
+                            }
 
-                                HorizontalLayout {
-                                    spacing: 4px;
-                                    LineEdit {
-                                        placeholder-text: "Node Name";
-                                        text: root.edit_label;
+                            LineEdit {
+                                placeholder-text: "Node Value";
+                                text: root.edit_value;
 
-                                        edited => {
-                                            root.edit_label = self.text;
-                                        }
-                                    }
-
-                                    LineEdit {
-                                        placeholder-text: "Node Value";
-                                        text: root.edit_value;
-
-                                        edited => {
-                                            root.edit_value = self.text;
-                                        }
-                                    }
+                                edited => {
+                                    root.edit_value = self.text;
                                 }
                             }
                         }
+                    }
+                }
 
                 ScrollView {
 
                     height: 350px;
 
-                        VerticalLayout {
+                    VerticalLayout {
 
                         spacing: 10px;
 
