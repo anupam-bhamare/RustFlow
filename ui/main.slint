@@ -13,12 +13,14 @@ export struct SymbolEntry {
     is_selected: bool,
     ip_ports: int,
     op_ports: int,
+    ip_types: [string],
     ip_names: [string],
     ip_values: [string],
+    op_types: [string],
     op_names: [string],
     op_values: [string],
-    ip_types: [string],
-    op_types: [string],
+    
+    
 }
 
 export struct Connection {
@@ -50,12 +52,14 @@ component NodeSymbol inherits Rectangle {
     property <length> port_size: 10px;
     property <length> header_height: 40px;
 
+    in property <[string]> ip_types;
     in property <[string]> ip_names;
     in property <[string]> ip_values;
-    in property <[string]> op_names;
-    in property <[string]> op_values;
-    in property <[string]> ip_types;
+    
     in property <[string]> op_types;
+    in property <[string]> op_names;
+    in property <[string]> op_values;    
+    
     in property <int> creation_mode: 0;
     width: 140px;
     height: header_height + ((ip_ports + op_ports) * row_height);
@@ -276,12 +280,15 @@ export component AppWindow inherits Window {
 
     min-width: 400px;
     min-height: 400px;
+    in-out property <[string]> ip_types: [];
     in-out property <[string]> ip_names: [];
     in-out property <[string]> ip_values: [];
+
+    in-out property <[string]> op_types: [];
     in-out property <[string]> op_names: [];
     in-out property <[string]> op_values: [];
-    in-out property <[string]> ip_types: [];
-    in-out property <[string]> op_types: [];
+    
+    
     pure function is_valid(type: string, val: string) -> bool {
         if (type == "Number") {
 
@@ -1301,14 +1308,18 @@ export component AppWindow inherits Window {
                             }
                         }
                         if (!is_connector): NodeSymbol {
+                            ip_types: item.ip_types;
                             ip_names: item.ip_names;
-                            op_names: item.op_names;
                             ip_values: item.ip_values;
+
+                            op_types: item.op_types;
+                            op_names: item.op_names;
                             op_values: item.op_values;
+
                             ip_ports: item.ip_ports;
                             op_ports: item.op_ports;
-                            ip_types: item.ip_types;
-                            op_types: item.op_types;
+                            
+                           
                             width: 100%;
                             height: 100%;
                             label: item.label == "" ? item.name : item.label;

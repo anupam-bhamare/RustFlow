@@ -187,12 +187,15 @@ ui.on_request_edit_node({
                
                 ui.set_ip_port_count(ip_port_count);
                 ui.set_op_port_count(op_port_count);
+
+                ui.set_ip_types(node.ip_types.clone());
                 ui.set_ip_names(node.ip_names.clone());
                 ui.set_ip_values(node.ip_values.clone());
-                ui.set_ip_types(node.ip_types.clone());
+                
+                ui.set_op_types(node.op_types.clone());
                 ui.set_op_names(node.op_names.clone());
                 ui.set_op_values(node.op_values.clone());
-                ui.set_op_types(node.op_types.clone());
+               
                 
                 ui.set_edit_label(node.label.clone());
                 ui.set_editing_index(index as i32);
@@ -840,84 +843,98 @@ ui.on_save_node_properties({
     let ui_handle = ui.as_weak();
     let conn_model = connections.clone();
 
-    move |index, _ip_count, _op_count, label, ip_names, ip_values, op_names, op_values, ip_types, op_types| {
-        if let Some(ui) = ui_handle.upgrade() {
+    move |index, _ip, _op, label, ip_names, ip_values, op_names, op_values, ip_types, op_types| {
+        let Some(ui) = ui_handle.upgrade() else { return false };
 
-         
-
- for i in 0..ip_types.row_count() {
-            let ty = ip_types.row_data(i).unwrap_or_default();
-            let value = ip_values.row_data(i).unwrap_or_default();
-
-            if ty.as_str() == "Number" && value.parse::<f64>().is_err() {
-             
-                ui.invoke_trigger_alert(
-                    format!("Invalid input value at port {}", i).into()
-                );
-                return false;
-            }
-        }
-
-      
-        for i in 0..op_types.row_count() {
-            let ty = op_types.row_data(i).unwrap_or_default();
-            let value = op_values.row_data(i).unwrap_or_default();
-
-            if ty.as_str() == "Number" && value.parse::<f64>().is_err() {
-                ui.invoke_trigger_alert(
-                   
-                    format!("Invalid output value at port {}", i).into()
-                );
-                return false;
-            }
-        }
-
-   
-            
-            if let Some(mut node) = model.row_data(index as usize) {
-                save_h();
-
-                let ip_n: Vec<slint::SharedString> = (0..ip_names.row_count())
-                    .map(|i| ip_names.row_data(i).unwrap_or_default())
-                    .filter(|s| !s.trim().is_empty())
-                    .collect();
-
-                let op_n: Vec<slint::SharedString> = (0..op_names.row_count())
-                    .map(|i| op_names.row_data(i).unwrap_or_default())
-                    .filter(|s| !s.trim().is_empty())
-                    .collect();
-
-                node.label = label;
-                node.ip_ports = ip_n.len() as i32;
-                node.op_ports = op_n.len() as i32;
-
-                node.ip_names = std::rc::Rc::new(slint::VecModel::from(ip_n)).into();
-                node.op_names = std::rc::Rc::new(slint::VecModel::from(op_n)).into();
-
-                node.ip_values = ip_values;
-                node.op_values = op_values;
-                node.ip_types = ip_types;
-                node.op_types = op_types;
-    for i in 0..conn_model.row_count() {
-    let mut conn = conn_model.row_data(i).unwrap();
+       
+for i in 0..ip_types.row_count() {
+    let ty = ip_types.row_data(i).unwrap_or_default();
+    let value = ip_values.row_data(i).unwrap_or_default();
     
-    if conn.from_index == index {
-        let (x, y) = calculate_port_offsets(&conn.from_port, node.ip_ports as usize);
-        conn.from_port_offset_y = y;
-        conn_model.set_row_data(i, conn);
+    let trimmed_value = value.trim();
+
+    if ty.as_str() == "Number" && !trimmed_value.is_empty() {
+        if trimmed_value.parse::<f64>().is_err() {
+            ui.invoke_trigger_alert(
+                format!("Invalid input value at port {}", i).into()
+            );
+            return false;
+        }
     }
 }
-                model.set_row_data(index as usize, node);
-            
-                ui.set_editing_index(-1);
-                return  true;
-             
-             
-            }
+
+      
+    for i in 0..op_types.row_count() {
+    let ty = op_types.row_data(i).unwrap_or_default();
+    let value = op_values.row_data(i).unwrap_or_default();
+    
+    let trimmed_value = value.trim();
+
+    if ty.as_str() == "Number" && !trimmed_value.is_empty() {
+        if trimmed_value.parse::<f64>().is_err() {
+            ui.invoke_trigger_alert(
+                format!("Invalid output value at port {}", i).into()
+            );
+            return false;
         }
-        return  false;
     }
-});  
+}     
+        
+        fn process_rows(names: &slint::ModelRc<slint::SharedString>, 
+                        values: &slint::ModelRc<slint::SharedString>, 
+                        types: &slint::ModelRc<slint::SharedString>) 
+                        -> (Vec<slint::SharedString>, Vec<slint::SharedString>, Vec<slint::SharedString>) {
+            let mut res_n = Vec::new();
+            let mut res_v = Vec::new();
+            let mut res_t = Vec::new();
+            for i in 0..names.row_count() {
+                let n = names.row_data(i).unwrap_or_default();
+                let v = values.row_data(i).unwrap_or_default();
+                let t = types.row_data(i).unwrap_or_default();
+                
+              
+                if !n.trim().is_empty() || !v.trim().is_empty() {
+                    res_n.push(n);
+                    res_v.push(v);
+                    res_t.push(t);
+                }
+            }
+            (res_n, res_v, res_t)
+        }
+
+        let (ip_n, ip_v, ip_t) = process_rows(&ip_names, &ip_values, &ip_types);
+        let (op_n, op_v, op_t) = process_rows(&op_names, &op_values, &op_types);
+
+      
+        if let Some(mut node) = model.row_data(index as usize) {
+            save_h();
+            node.label = label;
+            node.ip_ports = ip_n.len() as i32;
+            node.op_ports = op_n.len() as i32;
+            node.ip_names = std::rc::Rc::new(slint::VecModel::from(ip_n)).into();
+            node.ip_values = std::rc::Rc::new(slint::VecModel::from(ip_v)).into();
+            node.ip_types = std::rc::Rc::new(slint::VecModel::from(ip_t)).into();
+            node.op_names = std::rc::Rc::new(slint::VecModel::from(op_n)).into();
+            node.op_values = std::rc::Rc::new(slint::VecModel::from(op_v)).into();
+            node.op_types = std::rc::Rc::new(slint::VecModel::from(op_t)).into();
+
+            for i in 0..conn_model.row_count() {
+                if let Some(mut conn) = conn_model.row_data(i) {
+                    if conn.from_index == index {
+                        let (_, y) = calculate_port_offsets(&conn.from_port, node.ip_ports as usize);
+                        conn.from_port_offset_y = y;
+                        conn_model.set_row_data(i, conn);
+                    }
+                }
+            }
+            model.set_row_data(index as usize, node);
+            ui.set_editing_index(-1);
+            return true;
+        }
+        false
+    }
+}); 
+
     let ui_save_weak = ui.as_weak();
     let export_symbols_active = symbols_model.clone();
     let export_connections_active = connections.clone();
@@ -962,6 +979,11 @@ ui.on_save_node_properties({
     .iter()
     .map(|s| s.to_string()) 
     .collect(),
+    ip_types:item.ip_types
+    .iter()
+    .map(|s| s.to_string()) 
+    .collect(),
+
     op_names: item.op_names
     .iter()
     .map(|s| s.to_string()) 
@@ -969,11 +991,7 @@ ui.on_save_node_properties({
     op_values:item.op_values
     .iter()
     .map(|s| s.to_string()) 
-    .collect(),
-    ip_types:item.ip_types
-    .iter()
-    .map(|s| s.to_string()) 
-    .collect(),
+    .collect(),   
      op_types:item.op_types
     .iter()
     .map(|s| s.to_string()) 
