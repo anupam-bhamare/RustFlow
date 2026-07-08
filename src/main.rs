@@ -1,9 +1,12 @@
+use tokio::sync::mpsc;
+use std::sync::OnceLock;
 use slint::{ComponentHandle, Model, ModelRc, ToSharedString, VecModel, SharedString};
 use std::cell::{Cell, RefCell};
 use std::fs::File;
 use std::io::Write;
 use std::rc::Rc;
 mod graph_engine;
+mod mqtt_engine;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 slint::include_modules!();
@@ -61,6 +64,8 @@ pub struct JsonNode {
     pub op_values: Vec<String>,
     pub ip_types: Vec<String>,
     pub op_types: Vec<String>,
+    pub mqtt_topic: String,
+    pub mqtt_server: String,
     
 }
 
@@ -88,14 +93,26 @@ pub struct CanvasStateSnapshot {
     pub symbols: Vec<SymbolEntry>,
     pub connections: Vec<Connection>,
 }
+#[derive(Debug, Clone)]
+pub enum MqttCommand {
+    Publish { 
+        topic: String, 
+        payload: String 
+        },
+     Subscribe {
+        topic: String,
+    },
+}
+pub static MQTT_TX: OnceLock<mpsc::Sender<MqttCommand>> = OnceLock::new();
+
+pub static UI_UPDATE_TX: OnceLock<tokio::sync::mpsc::Sender<(String, String)>> = OnceLock::new();
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen(main))]
-pub fn main() -> Result<(), slint::PlatformError> {
+#[tokio::main]
+pub async fn main() -> Result<(), slint::PlatformError> {
     #[cfg(target_arch = "wasm32")]
     {
-        // Uncomment this! It will print the ACTUAL Rust panic message
-        // to your browser console instead of just saying "unreachable"
-        std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+         std::panic::set_hook(Box::new(console_error_panic_hook::hook));
     }
     let ui = AppWindow::new()?;
     let weak_app = ui.as_weak();
@@ -105,8 +122,8 @@ pub fn main() -> Result<(), slint::PlatformError> {
     ui.set_connections(connections.clone().into());
     let current_tool = Rc::new(RefCell::new("Text".to_string()));
     let subgraph_clipboard: Rc<RefCell<Option<SubgraphClipboard>>> = Rc::new(RefCell::new(None));
-    let ui_weak_select = ui.as_weak();
-
+    let ui_weak_select = ui.as_weak();        
+    mqtt_engine::start(ui.as_weak());   
     slint::invoke_from_event_loop(move || {
         if let Some(ui) = weak_app.upgrade() {
             ui.window().set_maximized(true);
@@ -208,12 +225,14 @@ let symbols_model_for_closure = symbols_model.clone();
 let connections_model = connections.clone();
 
 ui.on_deploy_flow_clicked(move || {
-       let connections_vec: Vec<Connection> = (0..connections_model.row_count())
+    let connections_vec: Vec<Connection> = (0..connections_model.row_count())
         .filter_map(|i| connections_model.row_data(i))
         .collect();
-       graph_engine::execute_deploy_flow(symbols_model_for_closure.clone(), connections_vec);
-
-     println!("Deployment flow executed successfully.");
+    
+    let symbols = symbols_model_for_closure.clone();
+    slint::spawn_local(async move {
+    graph_engine::execute_deploy_flow(symbols, connections_vec).await;
+       }).expect("Failed to spawn deployment task");
 });
     ui.on_node_clicked(move |clicked_index, shift_pressed| {
         if let Some(ui_active) = ui_weak_select.upgrade() {
@@ -687,6 +706,8 @@ ui.on_deploy_flow_clicked(move || {
                 op_values: slint::ModelRc::default(),
                 ip_types: slint::ModelRc::default(),
                 op_types: slint::ModelRc::default(),
+                mqtt_topic: "".into(),
+                mqtt_server: "".into(),
             });
         },
     );
@@ -817,7 +838,7 @@ ui.on_select_connection({
             println!("Selected connection {}", index);
         }
     });
-    ui.on_delete_selected_connection({
+ui.on_delete_selected_connection({
         let connections = connections.clone();
         let save_h = save_history.clone();
         move || {
@@ -934,6 +955,72 @@ for i in 0..ip_types.row_count() {
         false
     }
 }); 
+ui.on_save_node_mqtt_properties({
+    let model = symbols_model.clone();
+    let save_h = save_history.clone();
+    let ui_handle = ui.as_weak();
+    let conn_model = connections.clone();
+
+    move |index, _ip, _op, label, server_name, topic_name, ip_names, ip_values, op_names, op_values, ip_types, op_types| {
+        let Some(ui) = ui_handle.upgrade() else { return false };     
+           
+        fn process_rows(names: &slint::ModelRc<slint::SharedString>, 
+                        values: &slint::ModelRc<slint::SharedString>, 
+                        types: &slint::ModelRc<slint::SharedString>) 
+                        -> (Vec<slint::SharedString>, Vec<slint::SharedString>, Vec<slint::SharedString>) {
+            let mut res_n = Vec::new();
+            let mut res_v = Vec::new();
+            let mut res_t = Vec::new();
+            for i in 0..names.row_count() {
+                let n = names.row_data(i).unwrap_or_default();
+                let v = values.row_data(i).unwrap_or_default();
+                let t = types.row_data(i).unwrap_or_default();
+                
+              
+                if !n.trim().is_empty() || !v.trim().is_empty() {
+                    res_n.push(n);
+                    res_v.push(v);
+                    res_t.push(t);
+                }
+            }
+            (res_n, res_v, res_t)
+        }
+
+        let (ip_n, ip_v, ip_t) = process_rows(&ip_names, &ip_values, &ip_types);
+        let (op_n, op_v, op_t) = process_rows(&op_names, &op_values, &op_types);
+
+      
+        if let Some(mut node) = model.row_data(index as usize) {
+            save_h();
+            node.label = label;
+            node.ip_ports = ip_n.len() as i32;
+            node.op_ports = op_n.len() as i32;
+            node.ip_names = std::rc::Rc::new(slint::VecModel::from(ip_n)).into();
+            node.ip_values = std::rc::Rc::new(slint::VecModel::from(ip_v)).into();
+            node.ip_types = std::rc::Rc::new(slint::VecModel::from(ip_t)).into();
+            node.op_names = std::rc::Rc::new(slint::VecModel::from(op_n)).into();
+            node.op_values = std::rc::Rc::new(slint::VecModel::from(op_v)).into();
+            node.op_types = std::rc::Rc::new(slint::VecModel::from(op_t)).into();
+            node.mqtt_topic = topic_name;
+            node.mqtt_server = server_name;
+            for i in 0..conn_model.row_count() {
+                if let Some(mut conn) = conn_model.row_data(i) {
+                    if conn.from_index == index {
+                        let (_, y) = calculate_port_offsets(&conn.from_port, node.ip_ports as usize);
+                        conn.from_port_offset_y = y;
+                        conn_model.set_row_data(i, conn);
+                    }
+                }
+            }
+            model.set_row_data(index as usize, node);
+            ui.set_editing_index(-1);
+            return true;
+        }
+        false
+    }
+}); 
+
+
 
     let ui_save_weak = ui.as_weak();
     let export_symbols_active = symbols_model.clone();
@@ -970,7 +1057,8 @@ for i in 0..ip_types.row_count() {
                     creation_mode: item.creation_mode,
                     ip_ports: item.ip_ports,
                     op_ports: item.op_ports,
-                    
+                    mqtt_topic: item.mqtt_topic.to_string(),
+                    mqtt_server: item.mqtt_server.to_string(),
                     ip_names: item.ip_names
     .iter()
     .map(|s| s.to_string()) 
@@ -1156,7 +1244,7 @@ for i in 0..ip_types.row_count() {
                     value: node.value.into(),
                     bg_color: node.bg_color.into(),
                     creation_mode: node.creation_mode,
-                    is_selected: false,
+                    is_selected: false,                  
                     ip_ports: node.ip_ports,
                     op_ports: node.op_ports,
 
@@ -1166,7 +1254,8 @@ for i in 0..ip_types.row_count() {
                     op_values: ModelRc::new(VecModel::from(node.op_values.into_iter().map(SharedString::from).collect::<Vec<SharedString>>(),)),
                     ip_types: ModelRc::new(VecModel::from(node.ip_types.into_iter().map(SharedString::from).collect::<Vec<SharedString>>(),)),
                     op_types: ModelRc::new(VecModel::from(node.op_types.into_iter().map(SharedString::from).collect::<Vec<SharedString>>(),)),
-                
+                    mqtt_topic: node.mqtt_topic.to_shared_string(),
+                    mqtt_server: node.mqtt_server.to_shared_string(),
                 });
             }
 

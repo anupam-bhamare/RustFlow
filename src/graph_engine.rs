@@ -3,11 +3,11 @@ use crate::SymbolEntry;
 use slint::{Model, ModelRc, SharedString, VecModel};
 use std::rc::Rc;
 
-pub fn execute_deploy_flow(symbols_model: Rc<VecModel<SymbolEntry>>, wires: Vec<Connection>) {
+pub async fn execute_deploy_flow(symbols_model: Rc<VecModel<SymbolEntry>>, wires: Vec<Connection>) {
     let mut nodes: Vec<SymbolEntry> = (0..symbols_model.row_count())
         .filter_map(|i| symbols_model.row_data(i))
         .collect();
-
+    
     for _ in 0..nodes.len() {
         for node in nodes.iter_mut() {
             if node.node_type == "ui_function" {
@@ -36,7 +36,7 @@ pub fn execute_deploy_flow(symbols_model: Rc<VecModel<SymbolEntry>>, wires: Vec<
             let src_idx = nodes.iter().position(|n| n.id == wire.from_index);
             let dst_idx = nodes.iter().position(|n| n.id == wire.to_index);
 
-            if let (Some(src_i), Some(dst_i)) = (src_idx, dst_idx) {                
+            if let (Some(src_i), Some(dst_i)) = (src_idx, dst_idx) {
                 let src_port: usize = wire
                     .from_port
                     .split('_')
@@ -61,6 +61,49 @@ pub fn execute_deploy_flow(symbols_model: Rc<VecModel<SymbolEntry>>, wires: Vec<
                         ip_vals[dst_port] = val;
                         nodes[dst_i].ip_values = ModelRc::new(VecModel::from(ip_vals));
                     }
+                }
+            }
+        }
+    }
+
+    for node in nodes.iter() {
+        if node.node_type == "mqtt_in" {
+            if let Some(tx) = crate::MQTT_TX.get() {
+                let cmd = crate::MqttCommand::Subscribe {
+                    topic: node.mqtt_topic.to_string(),
+                };
+
+                if let Err(e) = tx.send(cmd).await {
+                    eprintln!("Failed to send Subscribe command: {:?}", e);
+                }
+                println!("DEBUG: Subscribe Successfully");
+            } else {
+                println!("DEBUG: MQTT_TX channel not initialized!");
+            }
+        }
+    }
+    for node in nodes.iter() {
+        if node.node_type == "mqtt_out" {
+            println!(
+                "Value is {}",
+                node.ip_values.row_data(0).unwrap_or_default()
+            );
+            if let Some(val) = node.ip_values.row_data(0) {
+                let topic_string = node.mqtt_topic.to_string();
+
+                if let Some(tx) = crate::MQTT_TX.get() {
+                    let cmd = crate::MqttCommand::Publish {
+                        topic: topic_string,
+                        payload: val.to_string(),
+                    };
+
+                    let res = tx.send(cmd).await;
+                    println!("DEBUG: Publish Successfully");
+                    if let Err(e) = res {
+                        println!("Failed to send MQTT command: {:?}", e);
+                    }
+                } else {
+                    println!("DEBUG: Error - MQTT_TX channel not initialized!");
                 }
             }
         }
