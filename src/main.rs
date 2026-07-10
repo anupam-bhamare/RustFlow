@@ -66,6 +66,10 @@ pub struct JsonNode {
     pub op_types: Vec<String>,
     pub mqtt_topic: String,
     pub mqtt_server: String,
+    pub mqtt_in_topic_names: Vec<String>,
+    pub mqtt_in_topic_values: Vec<String>,
+    pub mqtt_out_topic_names: Vec<String>,
+    pub mqtt_out_topic_values: Vec<String>,
     
 }
 
@@ -160,6 +164,44 @@ ui.on_add_ip_port({
         }
     }
 });
+ui.on_add_mqtt_in_topic_name({
+    let ui_handle = ui.as_weak();
+    move || {
+        if let Some(ui) = ui_handle.upgrade() {
+            
+            let mut names = model_to_vec(&ui.get_mqtt_in_topic_names());
+            
+            names.push("".into());
+            ui.set_mqtt_in_topic_names(std::rc::Rc::new(slint::VecModel::from(names)).into());
+            
+            let mut values = model_to_vec(&ui.get_mqtt_in_topic_values());
+            values.push("".into());
+            ui.set_mqtt_in_topic_values(std::rc::Rc::new(slint::VecModel::from(values)).into());
+
+          
+        }
+    }
+});
+
+ui.on_add_mqtt_out_topic_name({
+   
+    let ui_handle = ui.as_weak();
+    move || {
+        if let Some(ui) = ui_handle.upgrade() {
+            
+            let mut names = model_to_vec(&ui.get_mqtt_out_topic_names());
+             
+            names.push("".into());
+            ui.set_mqtt_out_topic_names(std::rc::Rc::new(slint::VecModel::from(names)).into());
+            
+            let mut values = model_to_vec(&ui.get_mqtt_out_topic_values());
+            values.push("".into());
+            ui.set_mqtt_out_topic_values(std::rc::Rc::new(slint::VecModel::from(values)).into());
+
+          
+        }
+    }
+});
 
 ui.on_add_op_port({
     let ui_handle = ui.as_weak();
@@ -212,7 +254,12 @@ ui.on_request_edit_node({
                 ui.set_op_types(node.op_types.clone());
                 ui.set_op_names(node.op_names.clone());
                 ui.set_op_values(node.op_values.clone());
+
+                ui.set_mqtt_in_topic_names(node.mqtt_in_topic_names.clone());
+                ui.set_mqtt_in_topic_values(node.mqtt_in_topic_values.clone());
                
+                ui.set_mqtt_out_topic_names(node.mqtt_out_topic_names.clone());
+                ui.set_mqtt_out_topic_values(node.mqtt_out_topic_values.clone());
                 
                 ui.set_edit_label(node.label.clone());
                 ui.set_editing_index(index as i32);
@@ -708,6 +755,11 @@ ui.on_deploy_flow_clicked(move || {
                 op_types: slint::ModelRc::default(),
                 mqtt_topic: "".into(),
                 mqtt_server: "".into(),
+                mqtt_in_topic_names: slint::ModelRc::default(),
+                mqtt_in_topic_values: slint::ModelRc::default(),
+                mqtt_out_topic_names: slint::ModelRc::default(),
+                mqtt_out_topic_values: slint::ModelRc::default(),
+                
             });
         },
     );
@@ -961,9 +1013,9 @@ ui.on_save_node_mqtt_properties({
     let ui_handle = ui.as_weak();
     let conn_model = connections.clone();
 
-    move |index, _ip, _op, label, server_name, topic_name, ip_names, ip_values, op_names, op_values, ip_types, op_types| {
+    move |index, _ip, _op, label, server_name, topic_name, ip_names, ip_values, op_names, op_values, ip_types, op_types, mqtt_in_topic_names, mqtt_in_topic_values, mqtt_out_topic_names, mqtt_out_topic_values| {
         let Some(ui) = ui_handle.upgrade() else { return false };     
-           
+         
         fn process_rows(names: &slint::ModelRc<slint::SharedString>, 
                         values: &slint::ModelRc<slint::SharedString>, 
                         types: &slint::ModelRc<slint::SharedString>) 
@@ -1003,6 +1055,10 @@ ui.on_save_node_mqtt_properties({
             node.op_types = std::rc::Rc::new(slint::VecModel::from(op_t)).into();
             node.mqtt_topic = topic_name;
             node.mqtt_server = server_name;
+            node.mqtt_in_topic_names = mqtt_in_topic_names;
+            node.mqtt_in_topic_values = mqtt_in_topic_values;
+            node.mqtt_out_topic_names = mqtt_out_topic_names;
+            node.mqtt_out_topic_values = mqtt_out_topic_values;
             for i in 0..conn_model.row_count() {
                 if let Some(mut conn) = conn_model.row_data(i) {
                     if conn.from_index == index {
@@ -1012,6 +1068,7 @@ ui.on_save_node_mqtt_properties({
                     }
                 }
             }
+             //println!("mqtt_out_topic_names count: {}",node.mqtt_out_topic_names.row_count());
             model.set_row_data(index as usize, node);
             ui.set_editing_index(-1);
             return true;
@@ -1081,6 +1138,26 @@ ui.on_save_node_mqtt_properties({
     .map(|s| s.to_string()) 
     .collect(),   
      op_types:item.op_types
+    .iter()
+    .map(|s| s.to_string()) 
+    .collect(),
+
+    mqtt_in_topic_names: item.mqtt_in_topic_names
+    .iter()
+    .map(|s| s.to_string()) 
+    .collect(),
+
+    mqtt_in_topic_values: item.mqtt_in_topic_values
+    .iter()
+    .map(|s| s.to_string()) 
+    .collect(),
+
+    mqtt_out_topic_names: item.mqtt_out_topic_names
+    .iter()
+    .map(|s| s.to_string()) 
+    .collect(),
+
+    mqtt_out_topic_values: item.mqtt_out_topic_values
     .iter()
     .map(|s| s.to_string()) 
     .collect(),
@@ -1256,6 +1333,12 @@ ui.on_save_node_mqtt_properties({
                     op_types: ModelRc::new(VecModel::from(node.op_types.into_iter().map(SharedString::from).collect::<Vec<SharedString>>(),)),
                     mqtt_topic: node.mqtt_topic.to_shared_string(),
                     mqtt_server: node.mqtt_server.to_shared_string(),
+
+                    mqtt_in_topic_names: ModelRc::new(VecModel::from(node.mqtt_in_topic_names.into_iter().map(SharedString::from).collect::<Vec<SharedString>>(),)),
+                    mqtt_in_topic_values: ModelRc::new(VecModel::from(node.mqtt_in_topic_values.into_iter().map(SharedString::from).collect::<Vec<SharedString>>(),)),
+                    mqtt_out_topic_names: ModelRc::new(VecModel::from(node.mqtt_out_topic_names.into_iter().map(SharedString::from).collect::<Vec<SharedString>>(),)),
+                    mqtt_out_topic_values: ModelRc::new(VecModel::from(node.mqtt_out_topic_values.into_iter().map(SharedString::from).collect::<Vec<SharedString>>(),)),
+                 
                 });
             }
 

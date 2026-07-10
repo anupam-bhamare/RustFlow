@@ -21,6 +21,10 @@ export struct SymbolEntry {
     op_values: [string],
     mqtt_server: string,
     mqtt_topic: string,
+    mqtt_in_topic_names: [string],
+    mqtt_in_topic_values: [string],
+    mqtt_out_topic_names: [string],
+    mqtt_out_topic_values: [string],
 }
 
 export struct Connection {
@@ -63,16 +67,40 @@ component NodeSymbol inherits Rectangle {
     in property <[string]> op_names;
     in property <[string]> op_values;
 
+    in property <[string]> mqtt_in_topic_names;
+    in property <[string]> mqtt_in_topic_values;
+    in property <[string]> mqtt_out_topic_names;
+    in property <[string]> mqtt_out_topic_values;
+
     in property <int> creation_mode: 0;
+    property <int> active_ip_ports:
+    root.type == "mqtt_out"
+        ? root.mqtt_out_topic_names.length
+        : root.ip_ports;
+
+    property <int> active_op_ports:
+    root.type == "mqtt_in"
+        ? root.mqtt_in_topic_names.length
+        : root.op_ports;
+
+    init => {
+        debug("mqtt_out_topic_names:", active_ip_ports);
+        debug("mqtt_in_topic_names:", active_op_ports);
+    }
+
     width: 140px;
-    height: header_height + ((ip_ports + op_ports) * row_height);
+    height: root.type == "mqtt_out"
+        ? header_height + (active_ip_ports * row_height)
+        : root.type == "mqtt_in"
+        ? header_height + (active_op_ports * row_height)
+        : header_height + ((ip_ports + op_ports) * row_height);
+
     background: #e1f5fe.with-alpha(0.5);
     border-width: 1px;
     border-color: #0288d1;
     border-radius: 4px;
     clip: false;
-    
- 
+
     drop-shadow-blur: 15px;
     drop-shadow-offset-y: 5px;
     drop-shadow-color: #0288d1.with-alpha(0.2);
@@ -87,7 +115,7 @@ component NodeSymbol inherits Rectangle {
         }
 
         Text {
-            text: (root.type == "mqtt_in" || root.type == "mqtt_out") ? root.mqtt_server : root.value;                                       
+            text: (root.type == "mqtt_in" || root.type == "mqtt_out") ? root.mqtt_server : root.value;
             font-italic: true;
             horizontal-alignment: center;
         }
@@ -100,7 +128,7 @@ component NodeSymbol inherits Rectangle {
         }
     }
 
-    for port[i] in root.ip_ports: Rectangle {
+    for port[i] in active_ip_ports: Rectangle {
         y: header_height + (i * row_height);
         width: parent.width;
         height: row_height;
@@ -119,12 +147,12 @@ component NodeSymbol inherits Rectangle {
             VerticalLayout {
                 alignment: center;
                 Text {
-                    text: (root.type == "mqtt_in" || root.type == "mqtt_out") ? "Topic" : root.ip_names[i];                                       
+                    text: root.type == "mqtt_out" ? root.mqtt_out_topic_names[i] : root.ip_names[i];
                     overflow: elide;
                 }
 
                 Text {
-                    text: (root.type == "mqtt_in" || root.type == "mqtt_out") ? root.mqtt_topic : root.ip_values[i];     
+                    text: root.type == "mqtt_out" ? root.mqtt_out_topic_values[i] : root.ip_values[i];
                     overflow: elide;
                     color: gray;
                 }
@@ -151,7 +179,7 @@ component NodeSymbol inherits Rectangle {
         }
     }
 
-    for port[i] in root.op_ports: Rectangle {
+    for port[i] in active_op_ports: Rectangle {
         y: header_height + (root.ip_ports * row_height) + (i * row_height);
         width: parent.width;
         height: row_height;
@@ -171,13 +199,13 @@ component NodeSymbol inherits Rectangle {
             VerticalLayout {
                 alignment: center;
                 Text {
-                    text: (root.type == "mqtt_in" || root.type == "mqtt_out") ? "Topic" : root.op_names[i];    
+                    text: root.type == "mqtt_in" ? root.mqtt_in_topic_names[i] : root.op_names[i];
                     overflow: elide;
                     horizontal-alignment: right;
                 }
 
                 Text {
-                    text: (root.type == "mqtt_in" || root.type == "mqtt_out") ? root.mqtt_topic : root.op_values[i];          
+                    text: root.type == "mqtt_in" ? root.mqtt_in_topic_values[i] : root.op_values[i];
                     overflow: elide;
                     color: gray;
                     horizontal-alignment: right;
@@ -296,6 +324,10 @@ export component AppWindow inherits Window {
     in-out property <[string]> op_names: [];
     in-out property <[string]> op_values: [];
 
+    in-out property <[string]> mqtt_in_topic_names: [];
+    in-out property <[string]> mqtt_in_topic_values: [];
+    in-out property <[string]> mqtt_out_topic_names: [];
+    in-out property <[string]> mqtt_out_topic_values: [];
 
     pure function is_valid(type: string, val: string) -> bool {
         if (type == "Number") {
@@ -308,6 +340,8 @@ export component AppWindow inherits Window {
 
     callback add_ip_port();
     callback add_op_port();
+    callback add_mqtt_in_topic_name();
+    callback add_mqtt_out_topic_name();
     callback request_edit_node(int);
     in-out property <int> ip_port_count;
     in-out property <int> op_port_count;
@@ -388,7 +422,7 @@ export component AppWindow inherits Window {
     callback vertical_layout();
     callback horizontal_layout();
     callback save_node_properties(int, int, int, string, [string], [string], [string], [string], [string], [string]) -> bool;
-    callback save_node_mqtt_properties(int, int, int, string, string, string, [string], [string], [string], [string], [string], [string]) -> bool;
+    callback save_node_mqtt_properties(int, int, int, string, string, string, [string], [string], [string], [string], [string], [string], [string], [string], [string], [string]) -> bool;
     callback select_library_symbol(string);
     callback place_symbol(string, string, string, float, float, int, int, int);
     callback update_symbol_position(int, float, float);
@@ -1297,8 +1331,8 @@ export component AppWindow inherits Window {
                             width: 100%;
                             height: 100%;
                             label: root.drag_name;
-                            type: root.drag_type;  
-                            mqtt_server: root.mqtt_server;                      
+                            type: root.drag_type;
+                            mqtt_server: root.mqtt_server;
                             mqtt_topic: root.mqtt_topic;
                             creation_mode: root.active_layout_mode;
                             ip_ports: root.function_node_ip_ports;
@@ -1311,7 +1345,14 @@ export component AppWindow inherits Window {
                         property <bool> is_OutConnector: item.node_type == "op_connector";
                         property <bool> is_connector: is_InputConnector || is_OutConnector;
                         width: is_connector ? 60px : 140px;
-                        height: is_connector ? 40px : 40px + (item.ip_ports + item.op_ports) * 35px;
+
+                        height: is_connector
+                            ? 40px
+                            : item.node_type == "mqtt_out"
+                            ? 40px + (item.mqtt_out_topic_names.length * 35px)
+                            : item.node_type == "mqtt_in"
+                            ? 40px + (item.mqtt_in_topic_names.length * 35px)
+                            : 40px + ((item.ip_ports + item.op_ports) * 35px);
 
                         x: item.x * 1px;
                         y: item.y * 1px;
@@ -1350,6 +1391,11 @@ export component AppWindow inherits Window {
 
                             ip_ports: item.ip_ports;
                             op_ports: item.op_ports;
+
+                            mqtt_in_topic_names: item.mqtt_in_topic_names;
+                            mqtt_in_topic_values: item.mqtt_in_topic_values;
+                            mqtt_out_topic_names: item.mqtt_out_topic_names;
+                            mqtt_out_topic_values: item.mqtt_out_topic_values;
 
                             width: 100%;
                             height: 100%;
@@ -1394,7 +1440,6 @@ export component AppWindow inherits Window {
                                 return EventResult.reject;
                             }
 
-                           
                             clicked => {
 
                                 root.select_connection(-1);
@@ -1981,7 +2026,7 @@ export component AppWindow inherits Window {
 
                                 HorizontalLayout {
                                     Text {
-                                        text: "Input Ports";
+                                        text: "Add Topics";
                                         font-size: 12px;
                                         font-weight: 600;
                                     }
@@ -1992,35 +2037,30 @@ export component AppWindow inherits Window {
                                         text: "+ Add";
 
                                         clicked => {
-                                            root.add_ip_port();
+                                            root.add_mqtt_out_topic_name();
                                         }
                                     }
                                 }
 
-                                for i in root.ip_names.length: HorizontalLayout {
+                                for i in root.mqtt_out_topic_names.length: HorizontalLayout {
                                     spacing: 4px;
-
-                                    ComboBox {
-                                        model: ["String"];
-                                        current-value: root.ip_types[i];
-                                        selected(val) => {
-                                            root.ip_types[i] = val;
-                                        }
-                                    }
 
                                     LineEdit {
                                         placeholder-text: "Name";
-                                        text: root.ip_names[i];
+                                        text: root.mqtt_out_topic_names[i];
 
                                         edited => {
-                                            root.ip_names[i] = self.text;
+                                            root.mqtt_out_topic_names[i] = self.text;
                                         }
                                     }
 
                                     LineEdit {
-                                        text: ip_values[i];
+                                        placeholder-text: "Data";
+                                        text: mqtt_out_topic_values[i];
 
-                                        edited(val) => { ip_values[i] = val; }
+                                        edited(val) => {
+                                            mqtt_out_topic_values[i] = val;
+                                        }
                                     }
                                 }
                             }
@@ -2038,7 +2078,7 @@ export component AppWindow inherits Window {
 
                                 HorizontalLayout {
                                     Text {
-                                        text: "Output Ports";
+                                        text: "Add Topics";
                                         font-size: 12px;
                                         font-weight: 600;
                                     }
@@ -2049,37 +2089,29 @@ export component AppWindow inherits Window {
                                         text: "+ Add";
 
                                         clicked => {
-                                            root.add_op_port();
+                                            root.add_mqtt_in_topic_name();
                                         }
                                     }
                                 }
 
-                                for i in root.op_names.length: HorizontalLayout {
+                                for i in root.mqtt_in_topic_names.length: HorizontalLayout {
                                     spacing: 4px;
-
-                                    ComboBox {
-                                        model: ["String"];
-                                        current-value: root.op_types[i];
-                                        selected(val) => {
-                                            root.op_types[i] = val;
-                                        }
-                                    }
 
                                     LineEdit {
                                         placeholder-text: "Name";
-                                        text: op_names[i];
+                                        text: mqtt_in_topic_names[i];
 
                                         edited => {
-                                            op_names[i] = self.text;
+                                            mqtt_in_topic_names[i] = self.text;
                                         }
                                     }
 
                                     LineEdit {
-                                        placeholder-text: "Value";
-                                        text: op_values[i];
+                                        placeholder-text: "Data";
+                                        text: mqtt_in_topic_values[i];
 
                                         edited => {
-                                            op_values[i] = self.text;
+                                            mqtt_in_topic_values[i] = self.text;
                                         }
                                     }
                                 }
@@ -2108,7 +2140,23 @@ export component AppWindow inherits Window {
                         primary: true;
                         clicked => {
 
-                            if (root.save_node_mqtt_properties( root.editing_index,        root.ip_ports,        root.op_ports,  root.edit_label,      root.mqtt_server, root.mqtt_topic,        root.ip_names,        root.ip_values,        root.op_names,        root.op_values,        root.ip_types,        root.op_types)) {
+                            if (root.save_node_mqtt_properties( 
+                                root.editing_index, 
+                                root.ip_ports,        
+                                root.op_ports,  
+                                root.edit_label,      
+                                root.mqtt_server, 
+                                root.mqtt_topic,        
+                                root.ip_names,        
+                                root.ip_values,        
+                                root.op_names,        
+                                root.op_values,        
+                                root.ip_types,        
+                                root.op_types, 
+                                root.mqtt_in_topic_names,
+                                root.mqtt_in_topic_values,
+                                root.mqtt_out_topic_names, 
+                                root.mqtt_out_topic_values)) {
 
                                 root.function_node_ip_ports = root.ip_ports;
 
